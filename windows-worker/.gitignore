@@ -1,0 +1,14 @@
+# Secrets
+.env
+
+# Build output
+bin/
+dist/
+
+# Go binaries
+*.exe
+*.out
+
+# Editor files
+.vscode/
+.idea/
