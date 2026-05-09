@@ -1,7 +1,8 @@
 const { Router } = require("express");
 const { v7: uuid } = require("uuid");
 const { notifications } = require("../data/store.js");
-const { getModels } = require("../models/models.js")
+const { getModels } = require("../models/models.js");
+const { logWithTimestamp } = require("../../linux-worker/util/helper.js");
 
 const router = Router()
 const { Notification } = getModels()
@@ -81,11 +82,29 @@ router.put("/:id", (req, res) => {
   res.json(notifications[idx])
 })
 
-router.delete("/:id", (req, res) => {
-  const idx = notifications.findIndex((n) => n.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ message: "Notification not found" })
-  notifications.splice(idx, 1)
-  res.json({ message: "Deleted" })
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const notification = await Notification.findById(id)
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" })
+    }
+
+    if (["locked", "processing"].includes(notification.status)) {
+      return res.status(409).json({ message: `Cannot delete notification with status '${notification.status}'` })
+    }
+
+    const result = await Notification.deleteOne({ _id: id, status: { $nin: ["locked", "processing"] }, })
+    if (result.deletedCount === 0) {
+      return res.status(409).json({ message: "Notification cannot be deleted while locked or processing" })
+    }
+
+    return res.status(200).json({ message: "Notification deleted successfully" })
+  } catch (error) {
+    logWithTimestamp("[delete notification]", error)
+    return res.status(500).json({ message: "Failed to delete notification" })
+  }
 })
 
 // Send notification now
