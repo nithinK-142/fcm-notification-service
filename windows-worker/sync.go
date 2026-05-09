@@ -17,6 +17,7 @@ import (
 type LocalUser struct {
 	ID                     primitive.ObjectID   `bson:"_id"`
 	GcmID                  string               `bson:"gcm_id"`
+	UpdatedAt              time.Time            `bson:"updatedAt"`
 	Category               []primitive.ObjectID `bson:"category"`
 	BusinessBillingAddress struct {
 		State string `bson:"business_billing_address_state"`
@@ -89,9 +90,10 @@ func fetchActiveUsers(ctx context.Context, coll *mongo.Collection) ([]LocalUser,
 		"registration_status": "Approved",
 	}
 	projection := bson.M{
-		"_id":      1,
-		"gcm_id":   1,
-		"category": 1,
+		"_id":       1,
+		"gcm_id":    1,
+		"updatedAt": 1,
+		"category":  1,
 		"business_billing_address.business_billing_address_state": 1,
 	}
 
@@ -126,10 +128,21 @@ func syncRecipients(
 	cfg Config,
 ) (inserted, updated, deleted, errs int) {
 
-	// Build active token set for O(1) lookup during delete phase.
-	activeTokens := make(map[string]struct{}, len(activeUsers))
+	// Deduplicate by gcm_id — keep the user with the latest updatedAt.
+	// Two users sharing a token (recycled device) would cause a unique index
+	// conflict; only the most recent owner should hold the token in Atlas.
+	deduped := make(map[string]LocalUser, len(activeUsers))
 	for _, u := range activeUsers {
-		activeTokens[u.GcmID] = struct{}{}
+		existing, seen := deduped[u.GcmID]
+		if !seen || u.UpdatedAt.After(existing.UpdatedAt) {
+			deduped[u.GcmID] = u
+		}
+	}
+
+	// Build active token set for O(1) lookup during delete phase.
+	activeTokens := make(map[string]struct{}, len(deduped))
+	for token := range deduped {
+		activeTokens[token] = struct{}{}
 	}
 
 	// ── Upsert phase ────────────────────────────────────────────────────────
@@ -158,7 +171,7 @@ func syncRecipients(
 
 	now := time.Now()
 	batch := make([]mongo.WriteModel, 0, cfg.BatchSize)
-	for _, u := range activeUsers {
+	for _, u := range deduped {
 		category := primitive.NilObjectID
 		if len(u.Category) > 0 {
 			category = u.Category[0]
