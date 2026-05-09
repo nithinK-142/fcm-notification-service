@@ -36,7 +36,13 @@ func runSyncLoop(cfg Config) {
 
 func runSync(cfg Config) {
 	start := time.Now()
-	log.Println("Sync started")
+	since := loadCheckpoint()
+
+	if since.IsZero() {
+		log.Println("Sync started — no checkpoint found, running full sync")
+	} else {
+		log.Printf("Sync started — incremental since %s", since.Format(time.RFC3339))
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -58,14 +64,29 @@ func runSync(cfg Config) {
 	localColl := localClient.Database(cfg.LocalDatabase).Collection(cfg.LocalCollection)
 	atlasColl := atlasClient.Database(cfg.AtlasDatabase).Collection(cfg.AtlasCollection)
 
-	activeUsers, err := fetchActiveUsers(ctx, localColl)
+	activeUsers, err := fetchActiveUsers(ctx, localColl, since)
 	if err != nil {
 		log.Printf("ERROR: fetching active users: %v", err)
 		return
 	}
-	log.Printf("Fetched %d active users from local DB", len(activeUsers))
+	log.Printf("Fetched %d changed users from local DB", len(activeUsers))
+
+	// Skip Atlas writes entirely if nothing changed.
+	if len(activeUsers) == 0 {
+		log.Println("No changes since last sync, skipping")
+		saveCheckpoint(start)
+		return
+	}
 
 	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, activeUsers, cfg)
+
+	// Only advance the checkpoint if the sync completed without errors.
+	// A partial failure means we re-process the same window next cycle.
+	if errs == 0 {
+		saveCheckpoint(start)
+	} else {
+		log.Printf("Sync had errors — checkpoint not advanced, will retry next cycle")
+	}
 
 	log.Printf(
 		"Sync done in %s — inserted: %d, updated: %d, deleted: %d, errors: %d",
@@ -76,12 +97,19 @@ func runSync(cfg Config) {
 
 // fetchActiveUsers streams qualifying users from local MongoDB.
 // Projection keeps the cursor lean — only the 4 fields we actually use.
-func fetchActiveUsers(ctx context.Context, coll *mongo.Collection) ([]LocalUser, error) {
+func fetchActiveUsers(ctx context.Context, coll *mongo.Collection, since time.Time) ([]LocalUser, error) {
 	filter := bson.M{
 		"gcm_id":              bson.M{"$exists": true, "$ne": ""},
 		"state":               "Active",
 		"registration_status": "Approved",
 	}
+
+	// If we have a checkpoint, only fetch users modified since then.
+	// Zero time means first run — fetch everything.
+	if !since.IsZero() {
+		filter["updatedAt"] = bson.M{"$gt": since}
+	}
+
 	projection := bson.M{
 		"_id":      1,
 		"gcm_id":   1,
