@@ -19,6 +19,7 @@ type Config struct {
 	BatchSize       int
 	WorkerCount     int
 	LogFilePath     string
+	IsProd          bool
 }
 
 // loadConfig reads from a .env file next to the binary, then falls back to
@@ -41,6 +42,7 @@ func loadConfig() Config {
 		BatchSize:       getEnvInt("BATCH_SIZE", 500),
 		WorkerCount:     getEnvInt("WORKER_COUNT", 4),
 		LogFilePath:     getEnvOrDefault("LOG_FILE_PATH", "C:\\fcm-sync\\fcm-sync.log"),
+		IsProd:          getEnvOrDefault("APP_ENV", "dev") == "prod",
 	}
 	return cfg
 }

@@ -25,7 +25,9 @@ type LocalUser struct {
 }
 
 func runSyncLoop(cfg Config) {
-	// setupFileLogger(cfg.LogFilePath) // applies in both service and `run` mode
+	if cfg.IsProd {
+		setupFileLogger(cfg.LogFilePath)
+	}
 	log.Printf("Starting sync loop, interval: %s", cfg.SyncInterval)
 
 	if shouldSkipInitialSync(loadCheckpoint(), cfg.SyncInterval) {
