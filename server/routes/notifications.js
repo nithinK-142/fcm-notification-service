@@ -64,22 +64,32 @@ router.post("/", async (req, res) => {
   res.status(201).json(created)
 })
 
-router.put("/:id", (req, res) => {
-  const idx = notifications.findIndex((n) => n.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ message: "Notification not found" })
+router.patch("/:id", async (req, res) => {
+  try {
+    const { id } = req.params
+    const { body } = req.body
 
-  if (notifications[idx].status === "sent") {
-    return res.status(400).json({ message: "Cannot edit a sent notification" })
-  }
+    const notification = await Notification.findById(id)
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" })
+    }
 
-  notifications[idx] = {
-    ...notifications[idx],
-    ...req.body,
-    id: notifications[idx].id,
-    createdAt: notifications[idx].createdAt,
-    updatedAt: new Date().toISOString(),
+    if (notification.status !== "pending") {
+      return res.status(409).json({ message: "Only pending notifications can be edited" })
+    }
+
+    const result = await Notification.updateOne(
+      { _id: id, status: { $nin: ["locked", "processing"] } },
+      { $set: { body, updated_at: new Date() } }
+    )
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({ message: "Only pending notifications can be edited" })
+    }
+    return res.status(200).json({ message: "Notification updated successfully" })
+  } catch (error) {
+    logWithTimestamp("[update notification]", error)
+    return res.status(500).json({ message: "Failed to update notification" })
   }
-  res.json(notifications[idx])
 })
 
 router.delete("/:id", async (req, res) => {

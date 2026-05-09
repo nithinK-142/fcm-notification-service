@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from "react"
-import { getNotifications, deleteNotification, sendNotification } from "@/lib/api"
+import { getNotifications, deleteNotification, sendNotification, updateNotification } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 import toast from "react-hot-toast"
 
@@ -131,6 +131,8 @@ export default function NotificationsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [confirmingId, setConfirmingId] = useState(null)
+  const [editNotif, setEditNotif] = useState(null)
+  const [editBody, setEditBody] = useState("")
 
   const fetchNotifications = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -230,10 +232,69 @@ export default function NotificationsPage() {
     }
   }, [fetchNotifications, page])
 
+  const handleEdit = useCallback(async () => {
+    if (!editNotif?._id) return
+    setActionId(editNotif._id + "-edit")
+    try {
+      await toast.promise(
+        updateNotification(editNotif._id, {
+          body: editBody,
+        }),
+        {
+          loading: "Updating notification...",
+          success: (response) => response?.data?.message || "Success",
+          error: (error) => error?.response?.data?.message || "Failed",
+        }
+      )
+      setEditNotif(null)
+      setEditBody("")
+      fetchNotifications(page)
+    } finally {
+      setActionId(null)
+    }
+  }, [editNotif, editBody, fetchNotifications, page])
+
   const startRow = (page - 1) * pageSize + 1
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
+
+      {/* edit */}
+      <Dialog open={!!editNotif} onOpenChange={(v) => !v && setEditNotif(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogTitle>Edit Notification</DialogTitle>
+
+          <div className="space-y-4 mt-4">
+            <Input
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              placeholder="Notification body"
+              disabled={actionId === editNotif?._id + "-edit"}
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditNotif(null)}
+                disabled={actionId === editNotif?._id + "-edit"}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                onClick={handleEdit}
+                disabled={!editBody.trim() || actionId === editNotif?._id + "-edit"}
+              >
+                {actionId === editNotif?._id + "-edit"
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : "Save"
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <NotificationDetailModal
         notification={detailNotif}
         open={!!detailNotif}
@@ -387,7 +448,21 @@ export default function NotificationsPage() {
                                 }
                               </Button>
                             )}
-
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Edit"
+                              onClick={() => {
+                                setEditNotif(n)
+                                setEditBody(n.body || "")
+                              }}
+                              disabled={!!actionId || !!confirmingId || n.status !== "pending"}
+                            >
+                              {actionId === n._id + "-edit"
+                                ? <Loader2 className="animate-spin w-4 h-4" />
+                                : <Pencil className="w-4 h-4" />
+                              }
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
