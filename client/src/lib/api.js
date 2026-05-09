@@ -21,7 +21,7 @@ api.interceptors.response.use(
 )
 
 // Products
-export const getProducts = (body) => api.post("/products", { body })
+export const getProducts = (body) => api.post("/products", body)
 
 // Notifications
 export const getNotifications = (params) => api.get("/notifications", { params })
