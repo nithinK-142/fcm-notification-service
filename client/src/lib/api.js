@@ -1,6 +1,6 @@
-import axios from "axios"
+import { Xior } from "xior"
 
-const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL}/api`, withCredentials: true, })
+const api = Xior.create({ baseURL: `${import.meta.env.VITE_API_URL}/api`, credentials: "include" })
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token")
