@@ -120,9 +120,10 @@ func syncRecipients(
 	cfg Config,
 ) (inserted, updated, deleted, errs int) {
 
-	activeSet := make(map[primitive.ObjectID]struct{}, len(activeUsers))
+	// Build active token set for O(1) lookup during delete phase.
+	activeTokens := make(map[string]struct{}, len(activeUsers))
 	for _, u := range activeUsers {
-		activeSet[u.ID] = struct{}{}
+		activeTokens[u.GcmID] = struct{}{}
 	}
 
 	// ── Upsert phase ────────────────────────────────────────────────────────
@@ -157,16 +158,16 @@ func syncRecipients(
 			category = u.Category[0]
 		}
 		model := mongo.NewUpdateOneModel().
-			SetFilter(bson.M{"user_id": u.ID}).
+			SetFilter(bson.M{"fcm_token": u.GcmID}).
 			SetUpdate(bson.M{
 				"$set": bson.M{
+					"user_id":               u.ID,
 					"fcm_token":             u.GcmID,
 					"state":                 u.BusinessBillingAddress.State,
 					"registration_category": category,
 					"updated_at":            now,
 				},
 				"$setOnInsert": bson.M{
-					"user_id":    u.ID,
 					"created_at": now,
 				},
 			}).
@@ -192,7 +193,7 @@ func syncRecipients(
 	// ── Delete phase ─────────────────────────────────────────────────────────
 
 	cursor, err := coll.Find(ctx, bson.M{},
-		options.Find().SetProjection(bson.M{"_id": 1, "user_id": 1}),
+		options.Find().SetProjection(bson.M{"_id": 1, "fcm_token": 1}),
 	)
 	if err != nil {
 		log.Printf("ERROR: listing atlas recipients for delete phase: %v", err)
@@ -204,13 +205,13 @@ func syncRecipients(
 	stale := make([]primitive.ObjectID, 0, cfg.BatchSize)
 	for cursor.Next(ctx) {
 		var rec struct {
-			ID     primitive.ObjectID `bson:"_id"`
-			UserID primitive.ObjectID `bson:"user_id"`
+			ID       primitive.ObjectID `bson:"_id"`
+			FcmToken string             `bson:"fcm_token"`
 		}
 		if err := cursor.Decode(&rec); err != nil {
 			continue
 		}
-		if _, active := activeSet[rec.UserID]; !active {
+		if _, active := activeTokens[rec.FcmToken]; !active {
 			stale = append(stale, rec.ID)
 		}
 
