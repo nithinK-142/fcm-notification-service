@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"path/filepath"
 	"log"
 	"os"
 	"strings"
@@ -26,7 +27,11 @@ type Config struct {
 // environment variables. This keeps secrets out of the binary and off the
 // command line while still working if env vars are set by the OS/SCM.
 func loadConfig() Config {
-	loadDotEnv(".env")
+	// load .env from the exe's directory instead.
+	exe, _ := os.Executable()
+	exe, _ = filepath.EvalSymlinks(exe)
+	envPath := filepath.Join(filepath.Dir(exe), ".env")
+	loadDotEnv(envPath)
 
 	mins := getEnvInt("SYNC_INTERVAL_MINUTES", 30)
 	interval := time.Duration(mins) * time.Minute
