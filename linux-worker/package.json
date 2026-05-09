@@ -1,0 +1,21 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "author": {
+    "name": "nithin",
+    "url": "https://github.com/nithinK-142"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "firebase-admin": "^13.8.0",
+    "mongoose": "^9.6.1",
+    "node-cron": "^4.2.1",
+    "xior": "^0.8.3"
+  }
+}
