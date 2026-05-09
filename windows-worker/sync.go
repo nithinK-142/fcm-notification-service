@@ -26,7 +26,12 @@ type LocalUser struct {
 func runSyncLoop(cfg Config) {
 	setupFileLogger(cfg.LogFilePath) // applies in both service and `run` mode
 	log.Printf("Starting sync loop, interval: %s", cfg.SyncInterval)
-	runSync(cfg)
+
+	if shouldSkipInitialSync(loadCheckpoint(), cfg.SyncInterval) {
+		log.Println("Recent checkpoint found — skipping sync on boot, waiting for next interval")
+	} else {
+		runSync(cfg)
+	}
 
 	ticker := time.NewTicker(cfg.SyncInterval)
 	defer ticker.Stop()
@@ -37,14 +42,7 @@ func runSyncLoop(cfg Config) {
 
 func runSync(cfg Config) {
 	start := time.Now()
-	since := loadCheckpoint()
-	fullSync := since.IsZero()
-
-	if fullSync {
-		log.Println("Sync started — no checkpoint, running full sync")
-	} else {
-		log.Printf("Sync started — incremental since %s", since.Format(time.RFC3339))
-	}
+	log.Println("Sync started")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -66,28 +64,14 @@ func runSync(cfg Config) {
 	localColl := localClient.Database(cfg.LocalDatabase).Collection(cfg.LocalCollection)
 	atlasColl := atlasClient.Database(cfg.AtlasDatabase).Collection(cfg.AtlasCollection)
 
-	users, err := fetchUsers(ctx, localColl, since)
+	activeUsers, err := fetchActiveUsers(ctx, localColl)
 	if err != nil {
-		log.Printf("ERROR: fetching users: %v", err)
+		log.Printf("ERROR: fetching active users: %v", err)
 		return
 	}
-	log.Printf("Fetched %d users from local DB", len(users))
+	log.Printf("Fetched %d active users from local DB", len(activeUsers))
 
-	if len(users) == 0 {
-		log.Println("No changes since last sync, skipping")
-		saveCheckpoint(start)
-		return
-	}
-
-	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, users, fullSync, cfg)
-
-	// Only advance the checkpoint if the sync completed without errors.
-	// On failure the same window is retried next cycle.
-	if errs == 0 {
-		saveCheckpoint(start)
-	} else {
-		log.Println("Sync had errors — checkpoint not advanced, will retry next cycle")
-	}
+	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, activeUsers, cfg)
 
 	log.Printf(
 		"Sync done in %s — inserted: %d, updated: %d, deleted: %d, errors: %d",
@@ -96,19 +80,14 @@ func runSync(cfg Config) {
 	)
 }
 
-// fetchUsers fetches qualifying users from local MongoDB.
-// If since is zero (full sync) it fetches all active users.
-// Otherwise only users modified after since.
-func fetchUsers(ctx context.Context, coll *mongo.Collection, since time.Time) ([]LocalUser, error) {
+// fetchActiveUsers streams qualifying users from local MongoDB.
+// Projection keeps the cursor lean — only the 4 fields we actually use.
+func fetchActiveUsers(ctx context.Context, coll *mongo.Collection) ([]LocalUser, error) {
 	filter := bson.M{
 		"gcm_id":              bson.M{"$exists": true, "$ne": ""},
 		"state":               "Active",
 		"registration_status": "Approved",
 	}
-	if !since.IsZero() {
-		filter["updatedAt"] = bson.M{"$gt": since}
-	}
-
 	projection := bson.M{
 		"_id":      1,
 		"gcm_id":   1,
@@ -129,21 +108,29 @@ func fetchUsers(ctx context.Context, coll *mongo.Collection, since time.Time) ([
 	return users, nil
 }
 
-// syncRecipients upserts changed users and — on full sync only — deletes stale recipients.
+// syncRecipients is the core sync engine.
 //
-// Delete runs only when fullSync=true because incremental runs only have a subset
-// of users. Diffing a subset against all Atlas recipients would incorrectly mark
-// the rest as stale and delete them (exactly the bug this fixes).
+// Upsert phase:
+//   - Splits activeUsers into batches of `batchSize`.
+//   - Sends each batch to a channel consumed by `workerCount` goroutines.
+//   - Each goroutine issues one BulkWrite per batch (N upserts in a single
+//     round-trip instead of N individual UpdateOne calls).
 //
-// Deactivated / token-removed users will be cleaned up on the next full sync,
-// which happens automatically whenever the checkpoint file is missing or reset.
+// Delete phase:
+//   - Streams Atlas recipient user_ids through a cursor (no full load into RAM).
+//   - Accumulates IDs not in the active set, then issues batched DeleteMany calls.
 func syncRecipients(
 	ctx context.Context,
 	coll *mongo.Collection,
-	users []LocalUser,
-	fullSync bool,
+	activeUsers []LocalUser,
 	cfg Config,
 ) (inserted, updated, deleted, errs int) {
+
+	// Build active token set for O(1) lookup during delete phase.
+	activeTokens := make(map[string]struct{}, len(activeUsers))
+	for _, u := range activeUsers {
+		activeTokens[u.GcmID] = struct{}{}
+	}
 
 	// ── Upsert phase ────────────────────────────────────────────────────────
 
@@ -169,14 +156,9 @@ func syncRecipients(
 		}()
 	}
 
-	// Build active token set (needed for delete phase if fullSync).
-	activeTokens := make(map[string]struct{}, len(users))
-
 	now := time.Now()
 	batch := make([]mongo.WriteModel, 0, cfg.BatchSize)
-	for _, u := range users {
-		activeTokens[u.GcmID] = struct{}{}
-
+	for _, u := range activeUsers {
 		category := primitive.NilObjectID
 		if len(u.Category) > 0 {
 			category = u.Category[0]
@@ -214,11 +196,7 @@ func syncRecipients(
 	updated = int(atomic.LoadInt64(&atomicUpdated))
 	errs = int(atomic.LoadInt64(&atomicErrs))
 
-	// ── Delete phase — full sync only ────────────────────────────────────────
-
-	if !fullSync {
-		return
-	}
+	// ── Delete phase ─────────────────────────────────────────────────────────
 
 	cursor, err := coll.Find(ctx, bson.M{},
 		options.Find().SetProjection(bson.M{"_id": 1, "fcm_token": 1}),
@@ -242,6 +220,7 @@ func syncRecipients(
 		if _, active := activeTokens[rec.FcmToken]; !active {
 			stale = append(stale, rec.ID)
 		}
+
 		if len(stale) == cfg.BatchSize {
 			d, e := executeDeleteBatch(ctx, coll, stale)
 			deleted += d
@@ -259,7 +238,8 @@ func syncRecipients(
 }
 
 // executeBulkUpsert sends one BulkWrite to Atlas and returns counts.
-// Ordered=false lets MongoDB continue past individual failures.
+// Ordered=false lets MongoDB parallelise the ops server-side and continue
+// past individual failures rather than aborting the whole batch.
 func executeBulkUpsert(ctx context.Context, coll *mongo.Collection, models []mongo.WriteModel) (inserted, updated, errCount int) {
 	opts := options.BulkWrite().SetOrdered(false)
 	result, err := coll.BulkWrite(ctx, models, opts)

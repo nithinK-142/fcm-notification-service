@@ -57,7 +57,11 @@ func runService() {
 
 // runSyncLoopWithStop is like runSyncLoop but honours a stop channel.
 func runSyncLoopWithStop(cfg Config, stop <-chan struct{}) {
-	runSync(cfg)
+	if shouldSkipInitialSync(loadCheckpoint(), cfg.SyncInterval) {
+		log.Println("Recent checkpoint found — skipping sync on boot, waiting for next interval")
+	} else {
+		runSync(cfg)
+	}
 
 	ticker := time.NewTicker(cfg.SyncInterval)
 	defer ticker.Stop()
