@@ -8,29 +8,30 @@ const { Notification } = getModels()
 
 router.get("/", async (req, res) => {
   try {
-    const { search, status } = req.query
+    const { search, status, page = 1, limit = 50 } = req.query
 
     const query = {}
-
-    // status filter
-    if (status) {
-      query.status = status
-    }
-
-    // search (product name + body)
+    if (status) query.status = status
     if (search) {
       query.$or = [
         { "product.name": { $regex: search, $options: "i" } },
-        { body: { $regex: search, $options: "i" } }
+        { body: { $regex: search, $options: "i" } },
       ]
     }
 
-    const result = await Notification.find({}).sort({ created_at: -1 })
+    const skip = (Number(page) - 1) * Number(limit)
+    const total = await Notification.countDocuments(query)
+    const result = await Notification.find(query)
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+
     res.json({
       notifications: result,
-      total: result.length
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
     })
-
   } catch (e) {
     console.error(e)
     res.status(500).json({ message: "Failed to fetch notifications" })
