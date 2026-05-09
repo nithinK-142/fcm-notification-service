@@ -127,7 +127,7 @@ function ProductDetailModal({ product, open, onClose, onCreateNotification }) {
                     <SelectItem value="low">Low</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button size="sm" className="gap-1.5 flex-1" onClick={handleCreate}>
+                <Button size="sm" className="gap-1.5 flex-1" onClick={handleCreate} disabled={creating}>
                   <Plus className="w-3.5 h-3.5" />
                   Create Notification
                 </Button>
@@ -154,6 +154,7 @@ export default function ProductsPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [creating, setCreating] = useState(false)
 
   const fetchProducts = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -199,16 +200,26 @@ export default function ProductsPage() {
   }, [products])
 
   const handleCreateNotification = useCallback(async (payload) => {
-    toast.promise(
-      createNotification(payload),
-      {
-        loading: "Creating notifications…",
-        success: () => { setSelected(new Set()); setNotifBodies({}); return `${payload.length} notification${payload.length !== 1 ? "s" : ""} created` },
-        error: (e) => e?.response?.data?.message || "Failed to create notification",
-      },
-      { position: "top-center" }
-    )
-  }, [])
+    if (creating) return
+    setCreating(true)
+    try {
+      await toast.promise(
+        createNotification(payload),
+        {
+          loading: "Creating notifications…",
+          success: () => {
+            setSelected(new Set())
+            setNotifBodies({})
+            return `${payload.length} notification${payload.length !== 1 ? "s" : ""} created`
+          },
+          error: (e) => e?.response?.data?.message || "Failed to create notification",
+        },
+        { position: "top-center" }
+      )
+    } finally {
+      setCreating(false)
+    }
+  }, [creating])
 
   const handleCreateFromTable = () => {
     if (!selected.size) return
@@ -239,7 +250,7 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold">Products</h1>
           <p className="text-sm text-muted-foreground">{total.toLocaleString()} total products</p>
         </div>
-        <Button onClick={handleCreateFromTable} disabled={!someSelected} className="gap-2">
+        <Button onClick={handleCreateFromTable} disabled={!someSelected || creating} className="gap-2">
           <Plus className="w-4 h-4" />
           Create Notification
           {someSelected && (
