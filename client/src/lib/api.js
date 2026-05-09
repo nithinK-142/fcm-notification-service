@@ -1,6 +1,6 @@
 import axios from "axios"
 
-const api = axios.create({ baseURL: "/api" })
+const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL}/api`, withCredentials: true, })
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token")
@@ -32,5 +32,8 @@ export const sendNotification = (id) => api.post(`/notifications/${id}/send`)
 
 // Dashboard
 export const getDashboardStats = () => api.get("/dashboard/stats")
+
+// Auth
+export const loginUser = (email, password) => api.post("/auth/login", { email, password })
 
 export default api
