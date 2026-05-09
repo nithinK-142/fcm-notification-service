@@ -1,7 +1,6 @@
 # FCM Sync Worker
 
-A Windows service that syncs active user FCM tokens from a local MongoDB instance
-to an Atlas MongoDB `recipients` collection every 30 minutes.
+A Windows service that syncs active user FCM tokens from a local MongoDB instance to an Atlas MongoDB `recipients` collection on a configurable interval (default 30 minutes).
 
 ## What it does
 
@@ -13,6 +12,7 @@ to an Atlas MongoDB `recipients` collection every 30 minutes.
    - Updates the token if it changed
    - Inserts new recipients if they don't exist
 3. Deletes any Atlas recipient whose `user_id` is no longer in the active set
+4. All writes use batched `BulkWrite` with concurrent workers — no single round-trip per document
 
 ## Project structure
 
@@ -21,92 +21,153 @@ fcm-sync/
 ├── main.go       # Entry point, CLI dispatch
 ├── service.go    # Windows Service handler + install/remove/start/stop
 ├── sync.go       # Core sync logic (fetch → upsert → delete)
-├── config.go     # .env loader + config struct
+├── config.go     # .env loader + Config struct
 ├── util.go       # File logger, exe path helper
 ├── go.mod
 └── .env.example  # Copy to .env and fill in your values
 ```
 
-## Install packages
+---
+
+## Prerequisites
+
+- [Go 1.21+](https://go.dev/dl/) installed on the machine you build on
+- Network access from the Windows server to both MongoDB instances
+- PowerShell running as Administrator for service commands
+
+---
+
+## Local development (foreground mode)
+
+Use this to test without installing a Windows service.
+
+### 1. Install dependencies
 
 ```bash
 go mod tidy
 ```
 
-## Build (cross-compile from Linux/Mac, targeting Windows)
+### 2. Set up config
 
 ```bash
-GOOS=windows GOARCH=amd64 go build -o fcm-sync.exe .
+cp .env.example .env
+# Edit .env and fill in your MongoDB URIs and DB names
 ```
 
-Or on Windows:
+### 3. Run in foreground
+
+```bash
+go run . run
+```
+
+This runs the sync loop in your terminal — first sync fires immediately, then repeats on the configured interval. `Ctrl+C` to stop. Logs go to stdout in this mode.
+
+---
+
+## Building
+
+### On Windows
 
 ```powershell
 go build -o fcm-sync.exe .
 ```
 
+### Cross-compile from Linux / Mac (targeting Windows)
+
+```bash
+GOOS=windows GOARCH=amd64 go build -o fcm-sync.exe .
+```
+
+---
+
 ## Deployment on Windows Server
 
 ### 1. Prepare the directory
+
+Run in PowerShell as Administrator:
 
 ```powershell
 New-Item -ItemType Directory -Path "C:\fcm-sync" -Force
 ```
 
-Copy `fcm-sync.exe` and your filled-in `.env` file to `C:\fcm-sync\`.
+Copy `fcm-sync.exe` to `C:\fcm-sync\`.
 
-### 2. Fill in config
+### 2. Set up config
 
 ```powershell
 Copy-Item .env.example C:\fcm-sync\.env
-notepad C:\fcm-sync\.env   # fill in your URIs
+notepad C:\fcm-sync\.env
 ```
 
-### 3. Install and start the service
+Fill in all required values (see `.env.example` for the full list). The binary reads `.env` from the same directory as the executable.
 
-Run PowerShell **as Administrator**:
+### 3. Install the service
 
 ```powershell
 cd C:\fcm-sync
 .\fcm-sync.exe install
+```
+
+This registers `FCMSyncWorker` with the Windows Service Control Manager as:
+- **Auto-start with delayed start** — starts automatically on every boot, after the network stack is ready
+- **Recovery actions** — SCM will restart the service after 60 s, 120 s, and 5 min on consecutive failures
+
+### 4. Start the service
+
+```powershell
 .\fcm-sync.exe start
 ```
 
-The service is registered as **auto-start with delayed start** — it will come up
-automatically after every server reboot, after the network stack is ready.
-
-Recovery actions are also configured: the SCM will restart the service after
-60 s, 120 s, and 5 min on consecutive failures, resetting the counter daily.
-
-### 4. Verify
+### 5. Verify it is running
 
 ```powershell
-Get-Service FCMSyncWorker   # should show Running
-Get-Content C:\fcm-sync\fcm-sync.log -Wait   # tail the log
+Get-Service FCMSyncWorker
 ```
 
-### 5. Other management commands
+Tail the log file:
 
 ```powershell
-.\fcm-sync.exe stop     # graceful stop
-.\fcm-sync.exe remove   # uninstall the service
-.\fcm-sync.exe run      # run in foreground (for testing, reads .env from CWD)
+Get-Content C:\fcm-sync\fcm-sync.log -Wait
 ```
 
-## Two things to update in sync.go
+---
 
-Before building, update the two database names to match your actual DB names:
+## Service management
 
-```go
-// sync.go  ~line 57
-localUsers := localClient.Database("your_local_db").Collection("users")
-atlasRecipients := atlasClient.Database("your_atlas_db").Collection("recipients")
-```
+All commands must be run from the directory containing `fcm-sync.exe`, in PowerShell as Administrator.
+
+| Command | Effect |
+|---|---|
+| `.\fcm-sync.exe install` | Register service with SCM (run once) |
+| `.\fcm-sync.exe start` | Start the service |
+| `.\fcm-sync.exe stop` | Gracefully stop the service |
+| `.\fcm-sync.exe remove` | Uninstall the service |
+| `.\fcm-sync.exe run` | Run in foreground without SCM (dev/debug) |
+
+---
+
+## Configuration reference
+
+All config is via `.env` (or environment variables — env vars take precedence over `.env`).
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `LOCAL_MONGO_URI` | yes | — | Connection string for local MongoDB |
+| `LOCAL_DATABASE` | yes | — | Database name on local MongoDB |
+| `LOCAL_COLLECTION` | no | `users` | Collection name on local MongoDB |
+| `ATLAS_MONGO_URI` | yes | — | Connection string for Atlas MongoDB |
+| `ATLAS_DATABASE` | yes | — | Database name on Atlas |
+| `ATLAS_COLLECTION` | no | `recipients` | Collection name on Atlas |
+| `SYNC_INTERVAL_MINUTES` | no | `30` | How often to run the sync |
+| `BATCH_SIZE` | no | `500` | Ops per BulkWrite / DeleteMany batch |
+| `WORKER_COUNT` | no | `4` | Concurrent goroutines writing to Atlas |
+| `LOG_FILE_PATH` | no | `C:\fcm-sync\fcm-sync.log` | Where to write logs when running as a service |
+
+> **Tuning tip:** If Atlas starts returning rate limit errors, lower `WORKER_COUNT`. If syncs are completing well within the interval and you want faster throughput, raise `BATCH_SIZE` first before touching `WORKER_COUNT`.
+
+---
 
 ## Notes
 
-- Logs rotate on each service start (append mode, never truncated). Rotate manually
-  or add a scheduled task to archive old logs if needed.
-- The `.env` file is read from the same directory as the executable. If you move
-  the binary, move the `.env` alongside it.
-- `SYNC_INTERVAL_MINUTES` defaults to 30 if not set.
+- Logs are opened in append mode — they survive service restarts and accumulate over time. Archive or truncate manually if needed, or set up a scheduled task to rotate them.
+- Running `.\fcm-sync.exe run` in foreground mode logs to stdout, not the log file.
