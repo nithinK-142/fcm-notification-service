@@ -25,7 +25,7 @@ type LocalUser struct {
 }
 
 func runSyncLoop(cfg Config) {
-	setupFileLogger(cfg.LogFilePath) // applies in both service and `run` mode
+	// setupFileLogger(cfg.LogFilePath) // applies in both service and `run` mode
 	log.Printf("Starting sync loop, interval: %s", cfg.SyncInterval)
 
 	if shouldSkipInitialSync(loadCheckpoint(), cfg.SyncInterval) {
@@ -43,7 +43,14 @@ func runSyncLoop(cfg Config) {
 
 func runSync(cfg Config) {
 	start := time.Now()
-	log.Println("Sync started")
+	since := loadCheckpoint()
+	fullSync := since.IsZero()
+
+	if fullSync {
+		log.Println("Sync started — no checkpoint, running full sync")
+	} else {
+		log.Printf("Sync started — incremental since %s", since.Format(time.RFC3339))
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -65,14 +72,27 @@ func runSync(cfg Config) {
 	localColl := localClient.Database(cfg.LocalDatabase).Collection(cfg.LocalCollection)
 	atlasColl := atlasClient.Database(cfg.AtlasDatabase).Collection(cfg.AtlasCollection)
 
-	activeUsers, err := fetchActiveUsers(ctx, localColl)
+	users, err := fetchUsers(ctx, localColl, since)
 	if err != nil {
-		log.Printf("ERROR: fetching active users: %v", err)
+		log.Printf("ERROR: fetching users: %v", err)
 		return
 	}
-	log.Printf("Fetched %d active users from local DB", len(activeUsers))
+	log.Printf("Fetched %d users from local DB", len(users))
 
-	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, activeUsers, cfg)
+	if len(users) == 0 {
+		log.Println("No changes since last sync, skipping")
+		saveCheckpoint(start)
+		return
+	}
+
+	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, users, fullSync, cfg)
+
+	// Only advance checkpoint if no errors — failed syncs retry the same window.
+	if errs == 0 {
+		saveCheckpoint(start)
+	} else {
+		log.Println("Sync had errors — checkpoint not advanced, will retry next cycle")
+	}
 
 	log.Printf(
 		"Sync done in %s — inserted: %d, updated: %d, deleted: %d, errors: %d",
@@ -81,13 +101,17 @@ func runSync(cfg Config) {
 	)
 }
 
-// fetchActiveUsers streams qualifying users from local MongoDB.
-// Projection keeps the cursor lean — only the 4 fields we actually use.
-func fetchActiveUsers(ctx context.Context, coll *mongo.Collection) ([]LocalUser, error) {
+// fetchUsers fetches qualifying users from local MongoDB.
+// If since is zero (full sync) it fetches all active users.
+// Otherwise only fetches users modified after since.
+func fetchUsers(ctx context.Context, coll *mongo.Collection, since time.Time) ([]LocalUser, error) {
 	filter := bson.M{
 		"gcm_id":              bson.M{"$exists": true, "$ne": ""},
 		"state":               "Active",
 		"registration_status": "Approved",
+	}
+	if !since.IsZero() {
+		filter["updatedAt"] = bson.M{"$gt": since}
 	}
 	projection := bson.M{
 		"_id":       1,
@@ -124,15 +148,16 @@ func fetchActiveUsers(ctx context.Context, coll *mongo.Collection) ([]LocalUser,
 func syncRecipients(
 	ctx context.Context,
 	coll *mongo.Collection,
-	activeUsers []LocalUser,
+	users []LocalUser,
+	fullSync bool,
 	cfg Config,
 ) (inserted, updated, deleted, errs int) {
 
 	// Deduplicate by gcm_id — keep the user with the latest updatedAt.
 	// Two users sharing a token (recycled device) would cause a unique index
 	// conflict; only the most recent owner should hold the token in Atlas.
-	deduped := make(map[string]LocalUser, len(activeUsers))
-	for _, u := range activeUsers {
+	deduped := make(map[string]LocalUser, len(users))
+	for _, u := range users {
 		existing, seen := deduped[u.GcmID]
 		if !seen || u.UpdatedAt.After(existing.UpdatedAt) {
 			deduped[u.GcmID] = u
@@ -209,7 +234,12 @@ func syncRecipients(
 	updated = int(atomic.LoadInt64(&atomicUpdated))
 	errs = int(atomic.LoadInt64(&atomicErrs))
 
-	// ── Delete phase ─────────────────────────────────────────────────────────
+	// ── Delete phase — full sync only ────────────────────────────────────────
+	// Incremental runs only have a subset of users. Diffing a subset against
+	// all Atlas recipients would incorrectly delete the rest as stale.
+	if !fullSync {
+		return
+	}
 
 	cursor, err := coll.Find(ctx, bson.M{},
 		options.Find().SetProjection(bson.M{"_id": 1, "fcm_token": 1}),

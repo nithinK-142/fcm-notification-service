@@ -12,3 +12,5 @@ dist/
 # Editor files
 .vscode/
 .idea/
+
+checkpoint.json

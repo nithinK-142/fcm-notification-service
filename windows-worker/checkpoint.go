@@ -49,17 +49,17 @@ func loadCheckpoint() time.Time {
 // saveCheckpoint persists atomically (write temp file, then rename).
 // Prevents a corrupt checkpoint if the process crashes mid-write.
 func saveCheckpoint(t time.Time) {
+	path := checkpointPath()
 	data, _ := json.Marshal(Checkpoint{LastSyncedAt: t})
-	tmp := checkpointPath() + ".tmp"
+	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0644); err != nil {
 		log.Printf("ERROR: could not write checkpoint: %v", err)
 		return
 	}
-	if err := os.Rename(tmp, checkpointPath()); err != nil {
+	if err := os.Rename(tmp, path); err != nil {
 		log.Printf("ERROR: could not save checkpoint: %v", err)
 	}
 }
-
 // shouldSkipInitialSync returns true if the last sync was recent enough that
 // running again immediately on boot would be redundant.
 // Threshold: if last sync was within 90% of the sync interval, skip.
