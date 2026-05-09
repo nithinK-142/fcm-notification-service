@@ -6,7 +6,7 @@ const { Product } = getModels()
 
 router.post("/", async (req, res) => {
   try {
-    const { search, category, status, page = 1, limit = 50 } = req.body
+    const { search, category, status, page = 1, limit = 25 } = req.body
 
     const query = {
       cmt_approver_status: "Accepted",

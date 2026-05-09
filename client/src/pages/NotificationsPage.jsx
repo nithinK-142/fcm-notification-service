@@ -10,22 +10,37 @@ import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, Chevron
 import { cn } from "@/lib/utils"
 
 const STATUSES = ["All", "pending", "sent"]
-const PAGE_SIZE = 50
+const PAGE_SIZES = [25, 50, 100, 300, 500]
+const DEFAULT_PAGE_SIZE = 25
 
 // ── Pagination ───────────────────────────────────────────────────────────────
-function Pagination({ page, totalPages, onPageChange }) {
-  if (totalPages <= 1) return null
+function Pagination({ page, totalPages, pageSize, onPageChange, onPageSizeChange }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-3 border-t bg-muted/20">
-      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onPageChange(page - 1)} disabled={page === 1}>
-        <ChevronLeft className="w-4 h-4" />
-      </Button>
-      <span className="text-xs text-muted-foreground">
-        Page <span className="font-medium text-foreground">{page}</span> of {totalPages}
-      </span>
-      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onPageChange(page + 1)} disabled={page === totalPages}>
-        <ChevronRight className="w-4 h-4" />
-      </Button>
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Rows</span>
+        <Select value={String(pageSize)} onValueChange={(v) => onPageSizeChange(Number(v))}>
+          <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZES.map((s) => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {totalPages > 1 && (
+        <>
+          <span className="text-xs text-muted-foreground">
+            Page <span className="font-medium text-foreground">{page}</span> of {totalPages}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(page - 1)} disabled={page === 1}>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => onPageChange(page + 1)} disabled={page === totalPages}>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -111,13 +126,14 @@ export default function NotificationsPage() {
   const [actionId, setActionId] = useState(null)
   const [detailNotif, setDetailNotif] = useState(null)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
 
-  const fetchNotifications = useCallback(async (p = page) => {
+  const fetchNotifications = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
     try {
-      const params = { page: p, limit: PAGE_SIZE }
+      const params = { page: p, limit: ps }
       if (search) params.search = search
       if (status !== "All") params.status = status
       const res = await getNotifications(params)
@@ -128,10 +144,11 @@ export default function NotificationsPage() {
     finally { setLoading(false) }
   }, [search, status, page])
 
-  useEffect(() => { setPage(1) }, [search, status])
-  useEffect(() => { fetchNotifications(page) }, [page, search, status])
+  useEffect(() => { setPage(1) }, [search, status, pageSize])
+  useEffect(() => { fetchNotifications(page, pageSize) }, [page, pageSize, search, status])
 
   const handlePageChange = (p) => { setPage(p); window.scrollTo(0, 0) }
+  const handlePageSizeChange = (s) => { setPageSize(s); setPage(1) }
 
   const handleDelete = useCallback(async (id) => {
     if (!window.confirm("Delete this notification?")) return
@@ -148,7 +165,7 @@ export default function NotificationsPage() {
     finally { setActionId(null) }
   }, [fetchNotifications, page])
 
-  const startRow = (page - 1) * PAGE_SIZE + 1
+  const startRow = (page - 1) * pageSize + 1
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
@@ -297,9 +314,9 @@ export default function NotificationsPage() {
 
               <div className="px-4 py-3 border-t bg-muted/20 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  Showing {startRow}–{Math.min(startRow + PAGE_SIZE - 1, total)} of {total.toLocaleString()}
+                  Showing {startRow}–{Math.min(startRow + pageSize - 1, total)} of {total.toLocaleString()}
                 </span>
-                <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
+                <Pagination page={page} totalPages={totalPages} pageSize={pageSize} onPageChange={handlePageChange} onPageSizeChange={handlePageSizeChange} />
               </div>
             </>
           )}

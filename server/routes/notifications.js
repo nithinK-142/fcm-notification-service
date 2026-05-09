@@ -8,7 +8,7 @@ const { Notification } = getModels()
 
 router.get("/", async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 50 } = req.query
+    const { search, status, page = 1, limit = 25 } = req.query
 
     const query = {}
     if (status) query.status = status
