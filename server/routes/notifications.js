@@ -54,7 +54,7 @@ router.post("/", async (req, res) => {
         brand,
         price
       },
-      body: body || "Now Live!",
+      body,
       priority
     });
   }

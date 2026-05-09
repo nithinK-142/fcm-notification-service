@@ -5,12 +5,12 @@ const { logWithTimestamp, chunk, delay } = require("./helper.js");
 const { ObjectId } = require("./constants.js");
 const { xiorInstance } = require("./xior.js");
 
-async function checkProductAvailibility(productId) {
+async function checkAndCreateBody(productId, isBodyRequired) {
   try {
-    const response = await xiorInstance.post(`/worker/check-product-availibility/${productId}`)
-    return response.data.message
+    const response = await xiorInstance.post("/worker/check-and-create-body", { id: productId, isBodyRequired })
+    return { status: response.data.message, body: response.data.body }
   } catch (error) {
-    logWithTimestamp("[checkProductAvailibility] Error:", error)
+    logWithTimestamp("[checkAndCreateBody] Error:", error)
     return "server_error"
   }
 }
@@ -36,18 +36,20 @@ async function processNotification() {
       { returnDocument: "after" }
     );
 
-    logWithTimestamp("[processNotification] No pending notifications found, exiting.");
-    if (!notification) return;
+    if (!notification) {
+      logWithTimestamp("[processNotification] No pending notifications found, exiting.");
+      return;
+    }
 
     logWithTimestamp("[processNotification] Processing:", notification._id);
 
     const startTime = Date.now();
 
-    const productAvailable = await checkProductAvailibility(notification.product.id);
-    if (productAvailable !== "available") {
+    const { status, body } = await checkAndCreateBody(notification.product.id, !notification.body ? true : false);
+    if (status !== "available") {
       await Notification.updateOne(
         { _id: notification._id },
-        { $set: { status: productAvailable } }
+        { $set: { status, body } }
       );
       return;
     }
@@ -64,6 +66,7 @@ async function processNotification() {
             total_recipients: 0,
             completed_at: new Date(),
             duration_ms: Date.now() - startTime,
+            body,
           },
         }
       );
@@ -81,6 +84,7 @@ async function processNotification() {
           total_recipients: tokens.length,
           batch_count: batches.length,
           started_at: new Date(),
+          body,
         },
       }
     );

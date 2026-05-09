@@ -72,7 +72,7 @@ async function sendMulticastNotification(notification, tokens) {
             },
             tokens,
         };
-        logWithTimestamp(message)
+        
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 return await withTimeout(messaging.sendEachForMulticast(message), 60000);
