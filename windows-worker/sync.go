@@ -13,18 +13,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const (
-	// Number of users per BulkWrite batch sent to Atlas.
-	// MongoDB's BulkWrite handles up to 100k ops but ~500 is the sweet spot
-	// for memory, latency, and retryability.
-	batchSize = 500
-
-	// How many batches can be in-flight to Atlas simultaneously.
-	// 4 goroutines × 500 ops = 2000 ops concurrently — enough for 5k users
-	// without overwhelming Atlas or the connection pool.
-	workerCount = 4
-)
-
 // LocalUser represents only the fields we need from the local users collection.
 type LocalUser struct {
 	ID                     primitive.ObjectID   `bson:"_id"`
@@ -77,7 +65,7 @@ func runSync(cfg Config) {
 	}
 	log.Printf("Fetched %d active users from local DB", len(activeUsers))
 
-	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, activeUsers)
+	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, activeUsers, cfg)
 
 	log.Printf(
 		"Sync done in %s — inserted: %d, updated: %d, deleted: %d, errors: %d",
@@ -129,9 +117,9 @@ func syncRecipients(
 	ctx context.Context,
 	coll *mongo.Collection,
 	activeUsers []LocalUser,
+	cfg Config,
 ) (inserted, updated, deleted, errs int) {
 
-	// Build active set for O(1) lookup during delete phase.
 	activeSet := make(map[primitive.ObjectID]struct{}, len(activeUsers))
 	for _, u := range activeUsers {
 		activeSet[u.ID] = struct{}{}
@@ -145,11 +133,10 @@ func syncRecipients(
 		atomicErrs     int64
 	)
 
-	// batchCh carries pre-built slices of BulkWrite models to worker goroutines.
-	batchCh := make(chan []mongo.WriteModel, workerCount*2)
+	batchCh := make(chan []mongo.WriteModel, cfg.WorkerCount*2)
 
 	var wg sync.WaitGroup
-	for i := 0; i < workerCount; i++ {
+	for i := 0; i < cfg.WorkerCount; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -162,9 +149,8 @@ func syncRecipients(
 		}()
 	}
 
-	// Slice users into batches and send to workers.
 	now := time.Now()
-	batch := make([]mongo.WriteModel, 0, batchSize)
+	batch := make([]mongo.WriteModel, 0, cfg.BatchSize)
 	for _, u := range activeUsers {
 		category := primitive.NilObjectID
 		if len(u.Category) > 0 {
@@ -187,13 +173,13 @@ func syncRecipients(
 			SetUpsert(true)
 
 		batch = append(batch, model)
-		if len(batch) == batchSize {
+		if len(batch) == cfg.BatchSize {
 			batchCh <- batch
-			batch = make([]mongo.WriteModel, 0, batchSize)
+			batch = make([]mongo.WriteModel, 0, cfg.BatchSize)
 		}
 	}
 	if len(batch) > 0 {
-		batchCh <- batch // flush remainder
+		batchCh <- batch
 	}
 
 	close(batchCh)
@@ -204,8 +190,6 @@ func syncRecipients(
 	errs = int(atomic.LoadInt64(&atomicErrs))
 
 	// ── Delete phase ─────────────────────────────────────────────────────────
-	// Stream Atlas recipient docs — only pulling {_id, user_id} — and collect
-	// IDs of records whose user is no longer active. Batch the deletes.
 
 	cursor, err := coll.Find(ctx, bson.M{},
 		options.Find().SetProjection(bson.M{"_id": 1, "user_id": 1}),
@@ -217,7 +201,7 @@ func syncRecipients(
 	}
 	defer cursor.Close(ctx)
 
-	stale := make([]primitive.ObjectID, 0, 128)
+	stale := make([]primitive.ObjectID, 0, cfg.BatchSize)
 	for cursor.Next(ctx) {
 		var rec struct {
 			ID     primitive.ObjectID `bson:"_id"`
@@ -230,8 +214,7 @@ func syncRecipients(
 			stale = append(stale, rec.ID)
 		}
 
-		// Flush deletes in batches so we never build a huge $in array.
-		if len(stale) == batchSize {
+		if len(stale) == cfg.BatchSize {
 			d, e := executeDeleteBatch(ctx, coll, stale)
 			deleted += d
 			errs += e
