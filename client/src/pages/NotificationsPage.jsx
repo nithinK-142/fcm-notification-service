@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import toast from "react-hot-toast"
 
 const STATUSES = ["All", "pending", "sent"]
 const PAGE_SIZES = [25, 50, 100, 300, 500]
@@ -94,7 +95,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
             </div>
             <div className="px-6 py-4 border-t bg-muted/30 flex items-center gap-3">
               {!alreadySent && (
-                <Button className="gap-2 flex-1" onClick={() => { onSend(n._id); onClose() }} disabled={isSending}>
+                <Button className="gap-2 flex-1" onClick={() => { onSend(n._id); onClose() }} disabled={isSending || isDeleting}>
                   {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Send Now
                 </Button>
@@ -105,7 +106,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
                   Sent to {n.sent_count} recipient{n.sent_count !== 1 ? "s" : ""}
                 </div>
               )}
-              <Button variant="destructive" className="gap-2" onClick={() => { onDelete(n._id); onClose() }} disabled={isDeleting}>
+              <Button variant="destructive" className="gap-2" onClick={() => { onDelete(n._id); onClose() }} disabled={isDeleting || isSending}>
                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 Delete
               </Button>
@@ -129,6 +130,7 @@ export default function NotificationsPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [confirmingId, setConfirmingId] = useState(null)
 
   const fetchNotifications = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -140,9 +142,13 @@ export default function NotificationsPage() {
       setNotifications(res.data.notifications || [])
       setTotal(res.data.total || 0)
       setTotalPages(res.data.totalPages || 1)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }, [search, status, page])
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to fetch notifications")
+    } finally {
+      setLoading(false)
+    }
+  }, [search, status, page, pageSize])
 
   useEffect(() => { setPage(1) }, [search, status, pageSize])
   useEffect(() => { fetchNotifications(page, pageSize) }, [page, pageSize, search, status])
@@ -150,19 +156,78 @@ export default function NotificationsPage() {
   const handlePageChange = (p) => { setPage(p); window.scrollTo(0, 0) }
   const handlePageSizeChange = (s) => { setPageSize(s); setPage(1) }
 
+  const confirmToast = (message) =>
+    new Promise((resolve) => {
+      toast((t) => (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">{message}</p>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                toast.dismiss(t.id)
+                resolve(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                toast.dismiss(t.id)
+                resolve(true)
+              }}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      ), {
+        duration: Infinity,
+      })
+    })
+
   const handleDelete = useCallback(async (id) => {
-    if (!window.confirm("Delete this notification?")) return
+    if (confirmingId || actionId) return
+    setConfirmingId(id + "-del")
+    const confirmed = await confirmToast("Delete this notification?")
+    setConfirmingId(null)
+    if (!confirmed) return
     setActionId(id + "-del")
-    try { await deleteNotification(id); fetchNotifications(page) }
-    finally { setActionId(null) }
-  }, [fetchNotifications, page])
+    try {
+      await toast.promise(
+        deleteNotification(id),
+        {
+          loading: "Deleting notification...",
+          success: (response) => response?.data?.message || "Success",
+          error: (error) => error?.response?.data?.message || "Failed",
+        }
+      )
+      fetchNotifications(page)
+    } finally {
+      setActionId(null)
+    }
+  }, [fetchNotifications, page, confirmingId, actionId])
 
   const handleSend = useCallback(async (id) => {
-    if (!window.confirm("Send this notification now?")) return
+    const confirmed = await confirmToast("Send this notification now?")
+    if (!confirmed) return
     setActionId(id + "-send")
-    try { await sendNotification(id); fetchNotifications(page) }
-    catch (e) { alert(e.response?.data?.message || "Failed") }
-    finally { setActionId(null) }
+    try {
+      await toast.promise(
+        sendNotification(id),
+        {
+          loading: "Sending notification...",
+          success: "Notification sent",
+          error: (e) => e?.response?.data?.message || "Failed to send notification",
+        }
+      )
+      fetchNotifications(page)
+    } finally {
+      setActionId(null)
+    }
   }, [fetchNotifications, page])
 
   const startRow = (page - 1) * pageSize + 1
@@ -196,17 +261,29 @@ export default function NotificationsPage() {
             {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="icon" onClick={() => fetchNotifications(page)}>
-          <RefreshCw className="w-4 h-4" />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => fetchNotifications(page)}
+          disabled={loading}
+        >
+          {loading
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <RefreshCw className="w-4 h-4" />
+          }
         </Button>
       </div>
 
       <Card className="overflow-hidden border shadow-sm">
         <CardContent className="p-0">
           {loading ? (
-            <div className="py-16 flex justify-center"><Loader2 className="animate-spin" /></div>
+            <div className="py-16 flex justify-center">
+              <Loader2 className="animate-spin" />
+            </div>
           ) : notifications.length === 0 ? (
-            <div className="py-16 text-center text-muted-foreground">No notifications</div>
+            <div className="py-16 text-center text-muted-foreground">
+              No notifications
+            </div>
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -297,12 +374,31 @@ export default function NotificationsPage() {
                         <td className="px-2 h-[72px]">
                           <div className="flex items-center justify-end gap-0.5">
                             {n.status !== "sent" && (
-                              <Button size="icon" variant="ghost" title="Send" onClick={() => handleSend(n._id)} disabled={actionId === n._id + "-send"}>
-                                {actionId === n._id + "-send" ? <Loader2 className="animate-spin w-4 h-4" /> : <Send className="w-4 h-4" />}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Send"
+                                onClick={() => handleSend(n._id)}
+                                disabled={!!actionId || !!confirmingId}
+                              >
+                                {actionId === n._id + "-send"
+                                  ? <Loader2 className="animate-spin w-4 h-4" />
+                                  : <Send className="w-4 h-4" />
+                                }
                               </Button>
                             )}
-                            <Button size="icon" variant="ghost" title="Delete" onClick={() => handleDelete(n._id)} disabled={actionId === n._id + "-del"}>
-                              {actionId === n._id + "-del" ? <Loader2 className="animate-spin w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Delete"
+                              onClick={() => handleDelete(n._id)}
+                              disabled={!!actionId || !!confirmingId}
+                            >
+                              {actionId === n._id + "-del"
+                                ? <Loader2 className="animate-spin w-4 h-4" />
+                                : <Trash2 className="w-4 h-4" />
+                              }
                             </Button>
                           </div>
                         </td>
