@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 import toast from "react-hot-toast"
+import { useTheme } from "@/context/ThemeContext"
+import { confirmToast } from "@/components/ConfirmToast"
 
 const PAGE_SIZES = [25, 50, 100, 300, 500]
 const DEFAULT_PAGE_SIZE = 25
@@ -119,6 +121,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
+  const { dark } = useTheme()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -160,43 +163,10 @@ export default function NotificationsPage() {
   const handlePageChange = (p) => { setPage(p); window.scrollTo(0, 0) }
   const handlePageSizeChange = (s) => { setPageSize(s); setPage(1) }
 
-  const confirmToast = (message) =>
-    new Promise((resolve) => {
-      toast((t) => (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">{message}</p>
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                toast.dismiss(t.id)
-                resolve(false)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                toast.dismiss(t.id)
-                resolve(true)
-              }}
-            >
-              Confirm
-            </Button>
-          </div>
-        </div>
-      ), {
-        duration: Infinity,
-      })
-    })
-
   const handleDelete = useCallback(async (id) => {
     if (confirmingId || actionId) return
     setConfirmingId(id + "-del")
-    const confirmed = await confirmToast("Delete this notification?")
+    const confirmed = await confirmToast("Delete this notification?", dark)
     setConfirmingId(null)
     if (!confirmed) return
     setActionId(id + "-del")
@@ -216,7 +186,7 @@ export default function NotificationsPage() {
   }, [fetchNotifications, page, confirmingId, actionId])
 
   const handleSend = useCallback(async (id) => {
-    const confirmed = await confirmToast("Send this notification now?")
+    const confirmed = await confirmToast("Send this notification now?", dark)
     if (!confirmed) return
     setActionId(id + "-send")
     try {
