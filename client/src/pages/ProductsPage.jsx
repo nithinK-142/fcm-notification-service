@@ -45,7 +45,7 @@ function Pagination({ page, totalPages, pageSize, onPageChange, onPageSizeChange
 }
 
 // ── Product Detail Modal ─────────────────────────────────────────────────────
-function ProductDetailModal({ product, open, onClose, onCreateNotification }) {
+function ProductDetailModal({ product, open, onClose, onCreateNotification, creating }) {
   const [body, setBody] = useState("")
   const [priority, setPriority] = useState("normal")
 
@@ -61,8 +61,13 @@ function ProductDetailModal({ product, open, onClose, onCreateNotification }) {
       name: product.name,
       imageUrl: product.imageUrl,
       state: product.state,
+      skuUic: product.skuUic,
       body,
       priority,
+      grade: product.grade,
+      brand: product.brand,
+      price: product.price,
+      category: product.category,
     }])
     onClose()
   }
@@ -89,7 +94,9 @@ function ProductDetailModal({ product, open, onClose, onCreateNotification }) {
               <p className="text-xs text-muted-foreground mt-0.5">ID: {product.id}</p>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2.5">
-              {detail("Category", product.category)}
+              {detail("Registration Category", product.category?.registration?.category_title ?? "-")}
+              {detail("Main Category", product.category?.main?.category_title ?? "-")}
+              {detail("Sub Category", product.category?.sub?.category_title ?? "-")}
               {detail("Brand", product.brand)}
               {detail("Price", product.price != null ? `₹${Number(product.price).toLocaleString()}` : null)}
               {detail("Avl. Stock", product.avlStock)}
@@ -227,10 +234,16 @@ export default function ProductsPage() {
     const payload = products
       .filter((p) => selected.has(p.id))
       .map((p) => ({
-        id: p.id, name: p.name, imageUrl: p.imageUrl, state: p.state,
-        skuUic: p.skuUic, body: notifBodies[p.id] || "",
+        id: p.id,
+        name: p.name,
+        imageUrl: p.imageUrl,
+        state: p.state,
+        skuUic: p.skuUic,
+        body: notifBodies[p.id] || "",
         priority: priorities[p.id] || "normal",
-        grade: p.grade, brand: p.brand, price: p.price,
+        grade: p.grade,
+        brand: p.brand,
+        price: p.price,
         category: p.category,
       }))
     handleCreateNotification(payload)
@@ -245,6 +258,7 @@ export default function ProductsPage() {
         open={!!detailProduct}
         onClose={() => setDetailProduct(null)}
         onCreateNotification={handleCreateNotification}
+        creating={creating}
       />
 
       <div className="flex items-center justify-between mb-6">
