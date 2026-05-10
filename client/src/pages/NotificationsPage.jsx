@@ -332,7 +332,7 @@ export default function NotificationsPage() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => { setStatus(["All"]); setSearch(""); fetchNotifications(page); }}
+          onClick={() => { setStatus(["All"]); setSearch(""); setDebouncedSearch(""); setPage(1); }}
           disabled={loading}
         >
           {loading
