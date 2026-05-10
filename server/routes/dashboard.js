@@ -1,30 +1,74 @@
 const { Router } = require("express");
-const { products, notifications } = require("../data/store.js");
+const { getModels } = require("../models/models.js");
 
-const router = Router()
+const router = Router();
+const { Product, Notification } = getModels();
 
-router.get("/stats", (req, res) => {
-  const totalProducts = products.length
-  const activeProducts = products.filter((p) => p.status === "active").length
-  const totalNotifications = notifications.length
-  const sentNotifications = notifications.filter((n) => n.status === "sent").length
+router.get("/stats", async (req, res) => {
+  try {
+    const [
+      totalProducts,
+      activeProducts,
+      totalNotifications,
+      sentNotifications,
+      totalRecipients,
+      recentNotifications,
+      recentProducts,
+    ] = await Promise.all([
+      Product.countDocuments(),
+      Product.countDocuments({ product_status: "Active", avl_stock: { $gt: 0 } }),
+      Notification.countDocuments(),
+      Notification.countDocuments({ status: "done" }),
+      Promise.resolve(null),
 
-  const recentNotifications = [...notifications]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5)
+      Notification.find()
+        .sort({ created_at: -1 })
+        .limit(5)
+        .select("product.name product.image_url body status priority sent_count created_at"),
 
-  const recentProducts = [...products]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5)
+      Product
+        .find({
+          cmt_approver_status: "Accepted",
+          cmt_approver_status_listing: "Accepted",
+          product_status: "Active",
+          avl_stock: { $gt: 0 },
+        })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select("product_name product_main_image_file_name listing_price product_status grade brand_name createdAt"),
+    ]);
 
-  res.json({
-    totalProducts,
-    activeProducts,
-    totalNotifications,
-    sentNotifications,
-    recentNotifications,
-    recentProducts,
-  })
-})
+    res.json({
+      totalProducts,
+      activeProducts,
+      totalNotifications,
+      sentNotifications,
+      totalRecipients,
+      recentNotifications: recentNotifications.map((n) => ({
+        id: n._id,
+        title: n.product?.name,
+        imageUrl: n.product?.image_url,
+        body: n.body,
+        status: n.status,
+        priority: n.priority,
+        sentCount: n.sent_count,
+        createdAt: n.created_at,
+      })),
+      recentProducts: recentProducts.map((p) => ({
+        id: p._id,
+        name: p.product_name,
+        imageUrl: p.product_main_image_file_name,
+        price: p.listing_price,
+        status: p.product_status,
+        grade: p.grade,
+        brand: p.brand_name,
+        createdAt: p.createdAt,
+      })),
+    });
+  } catch (e) {
+    console.error("[dashboard/stats]", e);
+    res.status(500).json({ message: "Failed to fetch stats" });
+  }
+});
 
 module.exports = router;

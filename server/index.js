@@ -10,7 +10,7 @@ const { logWithTimestamp } = require("./util/helper.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-console.log(process.env.ALLOWED_URLS.split(","))
+
 app.use(cors({ origin: process.env.ALLOWED_URLS.split(","), credentials: true }));
 app.use(express.json());
 

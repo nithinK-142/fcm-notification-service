@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { getDashboardStats } from "@/lib/api"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Package, Bell, TrendingUp, Send, ArrowRight, Loader2 } from "lucide-react"
+import { Package, Bell, Users, TrendingUp, Send, ArrowRight, Loader2 } from "lucide-react"
 
 function StatCard({ title, value, subtitle, icon: Icon, iconColor, iconBg, to, trend }) {
   return (
@@ -13,11 +13,11 @@ function StatCard({ title, value, subtitle, icon: Icon, iconColor, iconBg, to, t
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-muted-foreground font-medium">{title}</p>
-              <p className="font-display text-4xl font-bold mt-1 text-foreground">{value ?? "—"}</p>
-              {subtitle && (
-                <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>
-              )}
-              {trend !== undefined && (
+              <p className="text-4xl font-bold mt-1 tabular-nums">
+                {value ?? <span className="text-muted-foreground/40">—</span>}
+              </p>
+              {subtitle && <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>}
+              {trend && (
                 <div className="flex items-center gap-1 mt-2">
                   <TrendingUp className="w-3 h-3 text-emerald-500" />
                   <span className="text-xs text-emerald-600 font-medium">{trend}</span>
@@ -34,6 +34,17 @@ function StatCard({ title, value, subtitle, icon: Icon, iconColor, iconBg, to, t
         </CardContent>
       </Card>
     </Link>
+  )
+}
+
+function SectionHeader({ title, to }) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="font-semibold text-foreground">{title}</h2>
+      <Link to={to} className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
+        View all <ArrowRight className="w-3 h-3" />
+      </Link>
+    </div>
   )
 }
 
@@ -58,76 +69,81 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Overview of your B2R push notification platform
-        </p>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1">Overview of your B2R push notification platform</p>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
         <StatCard
           title="Total Products"
-          value={stats?.totalProducts}
+          value={stats?.totalProducts?.toLocaleString()}
           subtitle="Registered in catalog"
           icon={Package}
           iconColor="text-blue-600"
-          iconBg="bg-blue-50"
+          iconBg="bg-blue-50 dark:bg-blue-950/50"
           to="/products"
-          trend={`${stats?.activeProducts ?? 0} active`}
+          trend={`${stats?.activeProducts?.toLocaleString() ?? 0} active with stock`}
         />
         <StatCard
           title="Notifications"
-          value={stats?.totalNotifications}
+          value={stats?.totalNotifications?.toLocaleString()}
           subtitle="Created campaigns"
           icon={Bell}
           iconColor="text-violet-600"
-          iconBg="bg-violet-50"
+          iconBg="bg-violet-50 dark:bg-violet-950/50"
           to="/notifications"
-          trend={`${stats?.sentNotifications ?? 0} sent`}
+          trend={`${stats?.sentNotifications?.toLocaleString() ?? 0} done`}
         />
+        {stats?.totalRecipients != null && (
+          <StatCard
+            title="Recipients"
+            value={stats?.totalRecipients?.toLocaleString()}
+            subtitle="Registered FCM tokens"
+            icon={Users}
+            iconColor="text-emerald-600"
+            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+            to="/notifications"
+          />
+        )}
       </div>
 
       {/* Recent notifications */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-semibold text-foreground">Recent Notifications</h2>
-          <Link to="/notifications" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
-            View all <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
+        <SectionHeader title="Recent Notifications" to="/notifications" />
         <Card>
           <CardContent className="p-0">
-            {stats?.recentNotifications?.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                No notifications yet
-              </div>
+            {!stats?.recentNotifications?.length ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">No notifications yet</div>
             ) : (
               <div className="divide-y">
-                {stats?.recentNotifications?.map((n) => (
-                  <div key={n.id} className="flex items-center gap-4 px-6 py-4 hover:bg-secondary/30 transition-colors">
-                    <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                      {n.status === "sent" ? (
-                        <Send className="w-4 h-4 text-violet-600" />
-                      ) : (
-                        <Bell className="w-4 h-4 text-violet-400" />
-                      )}
+                {stats.recentNotifications.map((n) => (
+                  <div key={n.id} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center">
+                      {n.imageUrl
+                        ? <img src={n.imageUrl} alt={n.title} className="w-full h-full object-cover" />
+                        : <Bell className="w-4 h-4 text-violet-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{n.title}</p>
+                      <p className="text-sm font-medium truncate">{n.title ?? "—"}</p>
                       <p className="text-xs text-muted-foreground truncate">{n.body}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <Badge variant={
-                        n.status === "sent" ? "success" :
-                        n.status === "scheduled" ? "warning" : "secondary"
+                        n.status === "done"         ? "success"   :
+                        n.status === "processing"   ? "warning"   :
+                        n.status === "server_error" ? "destructive" : "secondary"
                       }>
                         {n.status}
                       </Badge>
+                      {n.sentCount > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Send className="w-3 h-3" /> {n.sentCount}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">
-                        {new Date(n.createdAt).toLocaleDateString()}
+                        {new Date(n.createdAt).toLocaleDateString("en-IN")}
                       </span>
                     </div>
                   </div>
@@ -140,33 +156,25 @@ export default function DashboardPage() {
 
       {/* Recent products */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-semibold text-foreground">Recent Products</h2>
-          <Link to="/products" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
-            View all <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
+        <SectionHeader title="Recent Products" to="/products" />
         <Card>
           <CardContent className="p-0">
-            {stats?.recentProducts?.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                No products yet
-              </div>
+            {!stats?.recentProducts?.length ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">No products yet</div>
             ) : (
               <div className="divide-y">
-                {stats?.recentProducts?.map((p) => (
-                  <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-secondary/30 transition-colors">
-                    <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <Package className="w-4 h-4 text-blue-600" />
+                {stats.recentProducts.map((p) => (
+                  <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/50 shrink-0 overflow-hidden flex items-center justify-center">
+                      {p.imageUrl
+                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                        : <Package className="w-4 h-4 text-blue-500" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{p.category}</p>
+                      <p className="text-xs text-muted-foreground">{p.brand} · {p.grade} Grade</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <Badge variant={p.status === "active" ? "success" : "secondary"}>
-                        {p.status}
-                      </Badge>
                       <span className="text-xs font-mono text-muted-foreground">
                         ₹{p.price?.toLocaleString("en-IN")}
                       </span>
