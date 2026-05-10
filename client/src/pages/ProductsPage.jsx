@@ -297,7 +297,8 @@ export default function ProductsPage() {
           <SelectContent>
             {categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}</SelectContent>
         </Select>
-        <Button variant="outline" size="icon" onClick={() => fetchProducts(page)} title="Refresh">
+        <Button variant="outline" size="icon" onClick={() => { setSearch(""); setCategory("All"); fetchProducts(page); }}
+          title="Refresh">
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
