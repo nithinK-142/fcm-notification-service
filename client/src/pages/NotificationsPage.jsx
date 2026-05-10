@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight, Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
 import toast from "react-hot-toast"
-import { useTheme } from "@/context/ThemeContext"
 import { confirmToast } from "@/components/ConfirmToast"
 
 const PAGE_SIZES = [25, 50, 100, 300, 500]
@@ -121,7 +120,6 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
-  const { dark } = useTheme()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -166,7 +164,7 @@ export default function NotificationsPage() {
   const handleDelete = useCallback(async (id) => {
     if (confirmingId || actionId) return
     setConfirmingId(id + "-del")
-    const confirmed = await confirmToast("Delete this notification?", dark)
+    const confirmed = await confirmToast("Delete this notification?")
     setConfirmingId(null)
     if (!confirmed) return
     setActionId(id + "-del")
@@ -186,7 +184,7 @@ export default function NotificationsPage() {
   }, [fetchNotifications, page, confirmingId, actionId])
 
   const handleSend = useCallback(async (id) => {
-    const confirmed = await confirmToast("Send this notification now?", dark)
+    const confirmed = await confirmToast("Send this notification now?")
     if (!confirmed) return
     setActionId(id + "-send")
     try {
