@@ -7,7 +7,7 @@ const { Product, Category } = getModels()
 
 router.post("/", async (req, res) => {
   try {
-    const { search, category, status, page = 1, limit = 25 } = req.body
+    const { search, category, page = 1, limit = 25 } = req.body
 
     const query = {
       cmt_approver_status: "Accepted",
@@ -15,12 +15,33 @@ router.post("/", async (req, res) => {
       product_status: "Active",
       avl_stock: { $gt: 0 },
     }
-    if (category) query.category = category
-    if (status) query.product_status = status
-    if (search) query.$or = [
-      { product_name: { $regex: search, $options: "i" } },
-      { brand_name: { $regex: search, $options: "i" } },
-    ]
+
+    const andConditions = []
+    function escapedData(unSanitized) {
+      return unSanitized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    if (search) {
+      andConditions.push({
+        $or: [
+          { product_name: { $regex: escapedData(search), $options: "i" } },
+          { brand_name: { $regex: escapedData(search), $options: "i" } },
+        ]
+      })
+    }
+    if (category && category !== "All") {
+      const sanitizedCategory = escapedData(category);
+      andConditions.push({
+        $or: [
+          { registration_category: sanitizedCategory },
+          { main_category: sanitizedCategory },
+          { sub_category: sanitizedCategory },
+        ]
+      })
+    }
+    if (andConditions.length) {
+      query.$and = andConditions
+    }
 
     const skip = (Number(page) - 1) * Number(limit)
     const total = await Product.countDocuments(query)

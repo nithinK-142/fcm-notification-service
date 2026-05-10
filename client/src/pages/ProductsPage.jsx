@@ -267,6 +267,16 @@ export default function ProductsPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search products…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <Select value={category} onValueChange={setCategory}>
           <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
