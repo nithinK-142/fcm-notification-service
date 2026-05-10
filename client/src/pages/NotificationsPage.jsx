@@ -332,7 +332,7 @@ export default function NotificationsPage() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => fetchNotifications(page)}
+          onClick={() => { setStatus(["All"]); setSearch(""); fetchNotifications(page); }}
           disabled={loading}
         >
           {loading
