@@ -2,6 +2,7 @@ const { Router } = require("express");
 const { getModels } = require("../models/models.js");
 const { logWithTimestamp } = require("../../linux-worker/util/helper.js");
 const { PRIORITY_RANK } = require("../util/constants.js");
+const { escapeRegex } = require("../util/helper.js");
 
 const router = Router()
 const { Notification } = getModels()
@@ -11,11 +12,14 @@ router.get("/", async (req, res) => {
     const { search, status, page = 1, limit = 25 } = req.query
 
     const query = {}
-    if (status) query.status = status
-    if (search) {
+    if (status && status !== "All") query.status = status
+    if (search?.trim()) {
+      const escapedSearch = escapeRegex(search)
       query.$or = [
-        { "product.name": { $regex: search, $options: "i" } },
-        { body: { $regex: search, $options: "i" } },
+        { "product.name": { $regex: escapedSearch, $options: "i" } },
+        { body: { $regex: escapedSearch, $options: "i" } },
+        { "product.brand": { $regex: escapedSearch, $options: "i" } },
+        { "product.sku_uic": { $regex: escapedSearch, $options: "i" } },
       ]
     }
 
