@@ -32,10 +32,14 @@ function logWithTimestamp(...args) {
   console.log(getTimestamp(), ":", ...args);
 }
 
+function escapeRegex(value) {
+  return value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 module.exports = {
   delay,
   chunk,
   getTimestamp,
   logWithTimestamp,
+  escapeRegex,
 };

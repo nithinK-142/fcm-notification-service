@@ -1,6 +1,6 @@
 const { Router } = require("express");
 const { getModels } = require("../models/models.js");
-const { logWithTimestamp } = require("../../linux-worker/util/helper.js");
+const { escapeRegex } = require("../util/helper.js");
 
 const router = Router()
 const { Product, Category } = getModels()
@@ -17,25 +17,22 @@ router.post("/", async (req, res) => {
     }
 
     const andConditions = []
-    function escapedData(unSanitized) {
-      return unSanitized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
 
     if (search) {
       andConditions.push({
         $or: [
-          { product_name: { $regex: escapedData(search), $options: "i" } },
-          { brand_name: { $regex: escapedData(search), $options: "i" } },
+          { product_name: { $regex: escapeRegex(search), $options: "i" } },
+          { brand_name: { $regex: escapeRegex(search), $options: "i" } },
         ]
       })
     }
     if (category && category !== "All") {
-      const sanitizedCategory = escapedData(category);
+      const escapedCategory = escapeRegex(category);
       andConditions.push({
         $or: [
-          { registration_category: sanitizedCategory },
-          { main_category: sanitizedCategory },
-          { sub_category: sanitizedCategory },
+          { registration_category: escapedCategory },
+          { main_category: escapedCategory },
+          { sub_category: escapedCategory },
         ]
       })
     }
