@@ -32,6 +32,7 @@ router.get("/", async (req, res) => {
 
     res.json({
       notifications: result,
+      statuses: ["All", ...new Set(result.map(r => r.status))],
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),

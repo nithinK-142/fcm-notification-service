@@ -10,7 +10,6 @@ import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, Chevron
 import { cn } from "@/lib/utils"
 import toast from "react-hot-toast"
 
-const STATUSES = ["All", "pending", "sent"]
 const PAGE_SIZES = [25, 50, 100, 300, 500]
 const DEFAULT_PAGE_SIZE = 25
 
@@ -133,6 +132,7 @@ export default function NotificationsPage() {
   const [confirmingId, setConfirmingId] = useState(null)
   const [editNotif, setEditNotif] = useState(null)
   const [editBody, setEditBody] = useState("")
+  const [statuses, setStatuses] = useState(["All"])
 
   const fetchNotifications = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -142,6 +142,7 @@ export default function NotificationsPage() {
       if (status !== "All") params.status = status
       const res = await getNotifications(params)
       setNotifications(res.data.notifications || [])
+      setStatuses(res.data.statuses || ["All"])
       setTotal(res.data.total || 0)
       setTotalPages(res.data.totalPages || 1)
     } catch (error) {
@@ -319,7 +320,7 @@ export default function NotificationsPage() {
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <Button
