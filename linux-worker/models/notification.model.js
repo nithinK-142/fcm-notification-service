@@ -12,6 +12,23 @@ const NotificationSchema = new mongoose.Schema(
       grade: String,
       price: Number,
       state: [String],
+      category: {
+        registration: {
+          _id: ObjectId,
+          category_title: String,
+          category_type: String,
+        },
+        main: {
+          _id: ObjectId,
+          category_title: String,
+          category_type: String,
+        },
+        main: {
+          _id: ObjectId,
+          category_title: String,
+          category_type: String,
+        },
+      }
     },
 
     body: { type: String, default: "Now Live!" },

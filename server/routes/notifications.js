@@ -43,7 +43,7 @@ router.post("/", async (req, res) => {
   const notifications = [];
 
   for (const doc of rawDocs) {
-    const { id, name, skuUic, imageUrl, state, body, priority, grade, brand, price } = doc;
+    const { id, name, skuUic, imageUrl, state, body, priority, grade, brand, price, category } = doc;
     notifications.push({
       product: {
         id,
@@ -53,7 +53,8 @@ router.post("/", async (req, res) => {
         sku_uic: skuUic,
         grade,
         brand,
-        price
+        price,
+        category,
       },
       body,
       priority,

@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Package, Loader2, RefreshCw, CheckSquare, Square, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const CATEGORIES = ["All", "Electronics", "Fashion", "Grocery", "Home", "Beauty", "Sports", "Other"]
 const PAGE_SIZES = [25, 50, 100, 300, 500]
 const DEFAULT_PAGE_SIZE = 25
 
@@ -155,6 +154,7 @@ export default function ProductsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [creating, setCreating] = useState(false)
+  const [categories, setCategories] = useState([])
 
   const fetchProducts = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -164,8 +164,9 @@ export default function ProductsPage() {
       if (category !== "All") body.category = category
       const res = await getProducts(body)
       setProducts(res.data.products || [])
-      setTotal(res.data.total || 0)
-      setTotalPages(res.data.totalPages || 1)
+      setTotal(res.data.pagination.total || 0)
+      setTotalPages(res.data.pagination.totalPages || 1)
+      setCategories(res.data.categories || [])
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [search, category, page])
@@ -230,6 +231,7 @@ export default function ProductsPage() {
         skuUic: p.skuUic, body: notifBodies[p.id] || "",
         priority: priorities[p.id] || "normal",
         grade: p.grade, brand: p.brand, price: p.price,
+        category: p.category,
       }))
     handleCreateNotification(payload)
   }
@@ -269,8 +271,7 @@ export default function ProductsPage() {
         <Select value={category} onValueChange={setCategory}>
           <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c === "All" ? "All Categories" : c}</SelectItem>)}
-          </SelectContent>
+            {categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}</SelectContent>
         </Select>
         <Button variant="outline" size="icon" onClick={() => fetchProducts(page)} title="Refresh">
           <RefreshCw className="w-4 h-4" />
@@ -364,7 +365,7 @@ export default function ProductsPage() {
 
                           <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{(p.viewCount ?? 0).toLocaleString()}</td>
                           <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{p.avlStock ?? "—"}</td>
-                          <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{p.category || "—"}</td>
+                          <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{p.category.registration.category_title || "—"}</td>
                           <td className="px-3 border-r border-border/50 h-[72px] text-sm font-mono">₹{(p.price ?? 0).toLocaleString()}</td>
 
                           <td className="px-3 h-[72px]" onClick={(e) => e.stopPropagation()}>
