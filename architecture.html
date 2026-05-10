@@ -1,0 +1,114 @@
+<div style="background:#212121;border-radius:12px;padding:24px">
+<svg width="100%" viewBox="0 0 680 740" role="img" style="display:block">
+<title>B2R Push Notification Platform — Architecture</title>
+<desc>Four-component system on a dark background: React admin client, Express API server, Linux worker, Go Windows worker, two MongoDB instances, Firebase FCM, and buyer devices.</desc>
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<!-- ── Client ── -->
+<g onclick="sendPrompt('Tell me more about the React admin console')">
+<rect x="200" y="20" width="280" height="56" rx="8" fill="#3C3489" stroke="#7F77DD" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#CECBF6" x="340" y="42" text-anchor="middle" dominant-baseline="central">React admin console</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#AFA9EC" x="340" y="62" text-anchor="middle" dominant-baseline="central">Vite · shadcn/ui · JWT auth</text>
+</g>
+
+<!-- client → server -->
+<line x1="340" y1="76" x2="340" y2="116" stroke="#7F77DD" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="350" y="100" dominant-baseline="central">JWT Bearer</text>
+
+<!-- ── Server ── -->
+<g onclick="sendPrompt('Tell me more about the Express API server')">
+<rect x="160" y="116" width="360" height="72" rx="8" fill="#085041" stroke="#1D9E75" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#9FE1CB" x="340" y="140" text-anchor="middle" dominant-baseline="central">Express API server</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#5DCAA5" x="340" y="160" text-anchor="middle" dominant-baseline="central">auth · products · notifications · dashboard</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#5DCAA5" x="340" y="176" text-anchor="middle" dominant-baseline="central">two Mongoose connections · JWT middleware</text>
+</g>
+
+<!-- server → local -->
+<line x1="240" y1="188" x2="120" y2="272" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arr)"/>
+<!-- server → atlas -->
+<line x1="440" y1="188" x2="560" y2="272" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- ── Local DB ── -->
+<g onclick="sendPrompt('What is stored in the local MongoDB?')">
+<rect x="30" y="272" width="210" height="80" rx="8" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#D3D1C7" x="135" y="296" text-anchor="middle" dominant-baseline="central">Local MongoDB</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#888780" x="135" y="316" text-anchor="middle" dominant-baseline="central">users · products · categories</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#888780" x="135" y="332" text-anchor="middle" dominant-baseline="central">price logs · team members</text>
+</g>
+
+<!-- ── Atlas DB ── -->
+<g onclick="sendPrompt('What is stored in Atlas MongoDB?')">
+<rect x="440" y="272" width="210" height="80" rx="8" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#D3D1C7" x="545" y="296" text-anchor="middle" dominant-baseline="central">Atlas MongoDB</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#888780" x="545" y="316" text-anchor="middle" dominant-baseline="central">notifications · recipients</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#888780" x="545" y="332" text-anchor="middle" dominant-baseline="central">priority_rank index</text>
+</g>
+
+<!-- ── Windows worker ── -->
+<g onclick="sendPrompt('Tell me more about the Go Windows sync worker')">
+<rect x="30" y="424" width="250" height="80" rx="8" fill="#0C447C" stroke="#378ADD" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#B5D4F4" x="155" y="448" text-anchor="middle" dominant-baseline="central">Windows worker (Go)</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#85B7EB" x="155" y="468" text-anchor="middle" dominant-baseline="central">FCM token sync · every 30 min</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#85B7EB" x="155" y="484" text-anchor="middle" dominant-baseline="central">incremental · BulkWrite · Windows SCM</text>
+</g>
+
+<!-- ── Linux worker ── -->
+<g onclick="sendPrompt('Tell me more about the Linux notification worker')">
+<rect x="400" y="424" width="250" height="80" rx="8" fill="#0C447C" stroke="#378ADD" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#B5D4F4" x="525" y="448" text-anchor="middle" dominant-baseline="central">Linux worker (Node.js)</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#85B7EB" x="525" y="468" text-anchor="middle" dominant-baseline="central">notification processor · every 1 min</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#85B7EB" x="525" y="484" text-anchor="middle" dominant-baseline="central">FCM multicast · retry · cron</text>
+</g>
+
+<!-- windows reads local -->
+<line x1="135" y1="424" x2="135" y2="352" stroke="#378ADD" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="44" y="392" dominant-baseline="central">reads users</text>
+
+<!-- windows writes atlas (L-bend to avoid crossing boxes) -->
+<path d="M280 464 L340 464 L340 400 L545 400 L545 352" fill="none" stroke="#378ADD" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="350" y="394" dominant-baseline="central">upserts recipients</text>
+
+<!-- linux reads atlas -->
+<line x1="525" y1="424" x2="545" y2="352" stroke="#378ADD" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="556" y="392" dominant-baseline="central">reads queue</text>
+
+<!-- linux calls server (dashed) -->
+<path d="M468 424 L468 370 L340 370 L340 188" fill="none" stroke="#378ADD" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="350" y="364" dominant-baseline="central">POST /worker/*</text>
+
+<!-- ── FCM ── -->
+<g onclick="sendPrompt('How does Firebase FCM work in this system?')">
+<rect x="400" y="574" width="250" height="56" rx="8" fill="#633806" stroke="#BA7517" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#FAC775" x="525" y="596" text-anchor="middle" dominant-baseline="central">Firebase FCM</text>
+<text font-family="var(--font-sans)" font-size="12" fill="#EF9F27" x="525" y="614" text-anchor="middle" dominant-baseline="central">sendEachForMulticast · 200/batch</text>
+</g>
+
+<!-- linux → FCM -->
+<line x1="525" y1="504" x2="525" y2="574" stroke="#BA7517" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- ── Devices ── -->
+<g onclick="sendPrompt('Who receives the push notifications?')">
+<rect x="400" y="692" width="250" height="44" rx="8" fill="#712B13" stroke="#D85A30" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#F5C4B3" x="525" y="714" text-anchor="middle" dominant-baseline="central">Buyer devices (Android / iOS)</text>
+</g>
+
+<!-- FCM → devices -->
+<line x1="525" y1="630" x2="525" y2="692" stroke="#D85A30" stroke-width="1.5" marker-end="url(#arr)"/>
+
+<!-- ── Legend ── -->
+<!-- <rect x="30" y="656" width="330" height="70" rx="6" fill="none" stroke="#444441" stroke-width="0.5"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#5F5E5A" x="46" y="674" dominant-baseline="central">Legend</text>
+<line x1="46" y1="692" x2="90" y2="692" stroke="#7F77DD" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="98" y="692" dominant-baseline="central">HTTP / JWT</text>
+<line x1="46" y1="712" x2="90" y2="712" stroke="#378ADD" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="98" y="712" dominant-baseline="central">Internal HTTP (no auth)</text>
+<line x1="196" y1="692" x2="240" y2="692" stroke="#1D9E75" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="248" y="692" dominant-baseline="central">MongoDB driver</text>
+<line x1="196" y1="712" x2="240" y2="712" stroke="#BA7517" stroke-width="1.5" marker-end="url(#arr)"/>
+<text font-family="var(--font-sans)" font-size="11" fill="#888780" x="248" y="712" dominant-baseline="central">FCM SDK</text> -->
+</svg>
+</div>
