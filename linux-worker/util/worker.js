@@ -2,7 +2,6 @@ const { Notification } = require("../models/notification.model.js")
 const { Recipient } = require("../models/recipient.model.js")
 const { sendMulticastNotification } = require("../config/multicast-notification.js");
 const { logWithTimestamp, chunk, delay } = require("./helper.js");
-const { ObjectId } = require("./constants.js");
 const { xiorInstance } = require("./xior.js");
 
 async function checkAndCreateBody(productId, isBodyRequired) {
@@ -15,14 +14,17 @@ async function checkAndCreateBody(productId, isBodyRequired) {
   }
 }
 
-async function getTokens() {
-  // await Recipient.insertOne({
-  //   user_id: new ObjectId("68833dec7d85ac190e8e132e"),
-  //   fcm_token: "dmgP28AlStqG_xfftd_DEO:APA91bGB2NetdU-1bMRIvuEJxWuHbyNOESoBIvvCUwu_E5sjWgwXGabXMOzU3QKthmzGx5QFybSOerVE5sy3d80ccwWc_-zD-b0UU_n0DnathLuFkacBCpM",
-  //   state: "DELHI",
-  //   registration_category: new ObjectId("67f8eab6c9b185c78ba70afb"),
-  // })
-  const tokens = await Recipient.find({})
+async function getTokens(notification) {
+  const states = notification.product.state || []
+
+  const hasAllState = states.some((s) => s?.toLowerCase() === "all")
+  const query = { registration_category: notification.product.category.registration.id, }
+
+  if (!hasAllState && states.length > 0) {
+    query.state = { $in: states.filter((s) => s?.toLowerCase() !== "all") }
+  }
+
+  const tokens = await Recipient.find(query, { _id: 0, fcm_token: 1 }).lean();
   return tokens.map(t => t.fcm_token);
 }
 
@@ -60,7 +62,7 @@ async function processNotification() {
       return;
     }
 
-    const tokens = await getTokens();
+    const tokens = await getTokens(notification);
 
     // no recipients
     if (!tokens || !tokens.length) {
