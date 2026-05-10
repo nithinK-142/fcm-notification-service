@@ -38,9 +38,9 @@ router.post("/check-and-create-body", async (req, res) => {
     { _id: 1, product_status: 1, avl_stock: 1, listing_price: 1 }
   )
 
-  if (!product) message = "product_not_found";
+  if (!product) message = "not_found";
   if (product.avl_stock <= 0) message = "no_stock";
-  if (product.avl_stock > 0 && product.product_status === "Deactive") message = "no_stock";
+  if (product.avl_stock > 0 && product.product_status === "Deactive") message = "deactive";
 
   let body;
   if (isBodyRequired) {
