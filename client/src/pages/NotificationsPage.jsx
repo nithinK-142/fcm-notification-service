@@ -122,6 +122,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [status, setStatus] = useState("All")
   const [actionId, setActionId] = useState(null)
   const [detailNotif, setDetailNotif] = useState(null)
@@ -138,7 +139,7 @@ export default function NotificationsPage() {
     setLoading(true)
     try {
       const params = { page: p, limit: ps }
-      if (search) params.search = search
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim()
       if (status !== "All") params.status = status
       const res = await getNotifications(params)
       setNotifications(res.data.notifications || [])
@@ -151,10 +152,10 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, status, page, pageSize])
+  }, [debouncedSearch, status, page, pageSize])
 
-  useEffect(() => { setPage(1) }, [search, status, pageSize])
-  useEffect(() => { fetchNotifications(page, pageSize) }, [page, pageSize, search, status])
+  useEffect(() => { setPage(1) }, [debouncedSearch, status, pageSize])
+  useEffect(() => { fetchNotifications(page, pageSize) }, [page, pageSize, debouncedSearch, status])
 
   const handlePageChange = (p) => { setPage(p); window.scrollTo(0, 0) }
   const handlePageSizeChange = (s) => { setPageSize(s); setPage(1) }
@@ -256,6 +257,11 @@ export default function NotificationsPage() {
   }, [editNotif, editBody, fetchNotifications, page])
 
   const startRow = (page - 1) * pageSize + 1
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(search) }, 400)
+    return () => clearTimeout(timer)
+  }, [search])
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
