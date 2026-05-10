@@ -17,8 +17,9 @@ const NotificationSchema = new mongoose.Schema(
     body: { type: String, default: "Now Live!" },
     status: { type: String, default: "pending" },
 
-    priority: { type: String, enum: ["high", "normal", "low"], default: "normal", index: true },
     execute_now: { type: Boolean, default: false },
+    priority: { type: String, enum: ["high", "normal", "low"], default: "normal", index: true },
+    priority_rank: { type: Number, enum: [0, 1, 2, 3], default: 2, index: true },
 
     link: String,
 

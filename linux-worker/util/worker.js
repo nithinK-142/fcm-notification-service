@@ -33,8 +33,14 @@ async function processNotification() {
     const notification = await Notification.findOneAndUpdate(
       { status: "pending" },
       { $set: { status: "locked" } },
-      { returnDocument: "after" }
-    );
+      {
+        returnDocument: "after",
+        sort: {
+          priority_rank: 1,  // 0 (execute_now) → 1 (high) → 2 (normal) → 3 (low)
+          created_at: 1,  // oldest first within same rank
+        },
+      }
+    )
 
     if (!notification) {
       logWithTimestamp("[processNotification] No pending notifications found, exiting.");

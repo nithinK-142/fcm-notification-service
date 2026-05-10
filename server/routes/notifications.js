@@ -3,6 +3,7 @@ const { v7: uuid } = require("uuid");
 const { notifications } = require("../data/store.js");
 const { getModels } = require("../models/models.js");
 const { logWithTimestamp } = require("../../linux-worker/util/helper.js");
+const { PRIORITY_RANK } = require("../util/constants.js");
 
 const router = Router()
 const { Notification } = getModels()
@@ -57,7 +58,8 @@ router.post("/", async (req, res) => {
         price
       },
       body,
-      priority
+      priority,
+      priority_rank: PRIORITY_RANK[priority] ?? 2,
     });
   }
   const created = await Notification.insertMany(Array.from(new Map(notifications.map(n => [n.product.id, n])).values()))
