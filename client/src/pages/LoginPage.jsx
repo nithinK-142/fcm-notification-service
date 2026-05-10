@@ -93,8 +93,10 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            Demo: <span className="font-mono">admin@dealsdray.com</span> / <span className="font-mono">admin123</span>
+          <p className="text-center text-xs text-muted-foreground mt-6 hidden">
+            Built & Shipped by <a href="https://github.com/nithinK-142" target="_blank" rel="noopener noreferrer" >
+              <span className="font-mono">nithinK-142</span>
+            </a>
           </p>
         </div>
       </div>

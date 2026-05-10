@@ -8,17 +8,15 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-api.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem("token")
-      localStorage.removeItem("user")
-      window.location.href = "/login"
-    }
-    return Promise.reject(err)
+api.interceptors.response.use((r) => r, (err) => {
+  const isLoginRequest = err.config?.url?.includes("/auth/login")
+  if (err.response?.status === 401 && !isLoginRequest) {
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    window.location.href = "/login"
   }
-)
+  return Promise.reject(err)
+})
 
 // Products
 export const getProducts = (body) => api.post("/products", body)
