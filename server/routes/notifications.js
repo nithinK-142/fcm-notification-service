@@ -1,6 +1,4 @@
 const { Router } = require("express");
-const { v7: uuid } = require("uuid");
-const { notifications } = require("../data/store.js");
 const { getModels } = require("../models/models.js");
 const { logWithTimestamp } = require("../../linux-worker/util/helper.js");
 const { PRIORITY_RANK } = require("../util/constants.js");
@@ -119,20 +117,47 @@ router.delete("/:id", async (req, res) => {
   }
 })
 
-// Send notification now
-router.post("/:id/send", (req, res) => {
-  const idx = notifications.findIndex((n) => n.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ message: "Notification not found" })
-  if (notifications[idx].status === "sent") {
-    return res.status(400).json({ message: "Already sent" })
+router.post("/:id/send", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const notification = await Notification.findById(id)
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" })
+    }
+
+
+    if (notification.status !== "pending") {
+      return res.status(409).json({ message: `Cannot send notification with status '${notification.status}'` })
+    }
+
+    if (notification.execute_now) {
+      return res.status(409).json({ message: "Notification is already marked for send now" })
+    }
+
+    const activeExecuteNowNotification = await Notification.findOne({
+      _id: { $ne: id },
+      execute_now: true,
+      status: { $nin: ["done", "server_error"] }
+    })
+
+    if (activeExecuteNowNotification) {
+      return res.status(409).json({ message: "Another notification is already marked for send now" })
+    }
+
+    const result = await Notification.updateOne(
+      { _id: id, status: "pending", execute_now: false },
+      { $set: { execute_now: true, priority_rank: 0, updated_at: new Date() } }
+    )
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({ message: "Notification could not be marked for send now" })
+    }
+
+    return res.status(200).json({ message: "Notification will send immediately or in the next run" })
+  } catch (error) {
+    logWithTimestamp("[send notification]", error)
+    return res.status(500).json({ message: "Failed to send notification" })
   }
-
-  // In a real app you'd call FCM/APNs here
-  notifications[idx].status = "sent"
-  notifications[idx].sentAt = new Date().toISOString()
-
-  console.log(`📤 Notification sent: "${notifications[idx].title}"`)
-  res.json({ message: "Notification sent successfully", notification: notifications[idx] })
 })
 
 module.exports = router;

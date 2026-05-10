@@ -222,8 +222,8 @@ export default function NotificationsPage() {
         sendNotification(id),
         {
           loading: "Sending notification...",
-          success: "Notification sent",
-          error: (e) => e?.response?.data?.message || "Failed to send notification",
+          success: (response) => response?.data?.message || "Success",
+          error: (error) => error?.response?.data?.message || "Failed",
         }
       )
       fetchNotifications(page)
@@ -440,7 +440,7 @@ export default function NotificationsPage() {
                                 variant="ghost"
                                 title="Send"
                                 onClick={() => handleSend(n._id)}
-                                disabled={!!actionId || !!confirmingId}
+                                disabled={!!actionId || !!confirmingId || n.status === "done"}
                               >
                                 {actionId === n._id + "-send"
                                   ? <Loader2 className="animate-spin w-4 h-4" />
