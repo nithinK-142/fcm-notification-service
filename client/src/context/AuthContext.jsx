@@ -1,4 +1,5 @@
 import api from "@/lib/api"
+import { jwtDecode } from "jwt-decode"
 import { createContext, useContext, useState, useEffect } from "react"
 
 const AuthContext = createContext(null)
@@ -9,25 +10,32 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem("token")
-    const savedUser = localStorage.getItem("user")
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser))
+    if (token) {
+      try {
+        const decoded = jwtDecode(token)
+        if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+          localStorage.removeItem("token")
+        } else {
+          setUser(decoded)
+        }
+      } catch {
+        localStorage.removeItem("token")
+      }
     }
     setLoading(false)
   }, [])
 
   const login = async (email, password) => {
     const res = await api.post("/auth/login", { email, password })
-    const { token, user } = res.data
+    const { token } = res.data
     localStorage.setItem("token", token)
-    localStorage.setItem("user", JSON.stringify(user))
-    setUser(user)
-    return user
+    const decoded = jwtDecode(token)
+    setUser(decoded)
+    return decoded
   }
 
   const logout = () => {
     localStorage.removeItem("token")
-    localStorage.removeItem("user")
     setUser(null)
     window.location.href = "/login"
   }

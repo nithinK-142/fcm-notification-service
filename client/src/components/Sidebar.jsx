@@ -114,10 +114,12 @@ export default function Sidebar() {
         {!collapsed ? (
           <>
             <div className="flex items-center gap-3 px-3 py-2 mb-2 rounded-lg bg-secondary/60">
-              <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-primary">
-                  {user?.name?.charAt(0)?.toUpperCase() || "A"}
-                </span>
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-primary/15 flex items-center justify-center" title={user?.name || "Admin"}>
+                {user?.profile ? (
+                  <img src={user.profile} alt={user?.name || "Admin"} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-primary">{user?.name?.charAt(0)?.toUpperCase() || "A"}</span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate">{user?.name || "Admin"}</p>
@@ -146,13 +148,12 @@ export default function Sidebar() {
           </>
         ) : (
           <>
-            <div
-              className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center"
-              title={user?.name || "Admin"}
-            >
-              <span className="text-xs font-bold text-primary">
-                {user?.name?.charAt(0)?.toUpperCase() || "A"}
-              </span>
+            <div className="w-7 h-7 rounded-full overflow-hidden bg-primary/15 flex items-center justify-center" title={user?.name || "Admin"}>
+              {user?.profile ? (
+                <img src={user.profile} alt={user?.name || "Admin"} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-primary">{user?.name?.charAt(0)?.toUpperCase() || "A"}</span>
+              )}
             </div>
             <button
               onClick={toggleTheme}

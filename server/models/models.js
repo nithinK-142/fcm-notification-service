@@ -2,6 +2,7 @@ const { ProductModel } = require("./product.model.js");
 const { NotificationModel } = require("./notification.model.js");
 const { ProductPriceLogModel } = require("./product-price-log.model.js");
 const { CategoryModel } = require("./category.model.js");
+const { TeamMemberModel } = require("./team-member.model.js");
 
 let models = null;
 
@@ -12,6 +13,7 @@ async function initModels(LOCAL_DB, ATLAS_DB) {
         Notification: NotificationModel(ATLAS_DB),
         ProductPriceLog: ProductPriceLogModel(LOCAL_DB),
         Category: CategoryModel(LOCAL_DB),
+        TeamMember: TeamMemberModel(LOCAL_DB),
     };
     return models;
 }
