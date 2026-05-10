@@ -151,6 +151,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [category, setCategory] = useState("All")
   const [selected, setSelected] = useState(new Set())
   const [notifBodies, setNotifBodies] = useState({})
@@ -167,7 +168,7 @@ export default function ProductsPage() {
     setLoading(true)
     try {
       const body = { page: p, limit: ps }
-      if (search) body.search = search
+      if (debouncedSearch.trim()) body.search = debouncedSearch.trim()
       if (category !== "All") body.category = category
       const res = await getProducts(body)
       setProducts(res.data.products || [])
@@ -176,10 +177,10 @@ export default function ProductsPage() {
       setCategories(res.data.categories || [])
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
-  }, [search, category, page])
+  }, [debouncedSearch, category, page])
 
-  useEffect(() => { setPage(1) }, [search, category, pageSize])
-  useEffect(() => { fetchProducts(page, pageSize) }, [page, pageSize, search, category])
+  useEffect(() => { setPage(1) }, [debouncedSearch, category, pageSize])
+  useEffect(() => { fetchProducts(page, pageSize) }, [page, pageSize, debouncedSearch, category])
 
   const handlePageChange = (p) => { setPage(p); setSelected(new Set()); window.scrollTo(0, 0) }
   const handlePageSizeChange = (s) => { setPageSize(s); setPage(1); setSelected(new Set()) }
@@ -250,6 +251,11 @@ export default function ProductsPage() {
   }
 
   const startRow = (page - 1) * pageSize + 1
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(search) }, 400)
+    return () => clearTimeout(timer)
+  }, [search])
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
