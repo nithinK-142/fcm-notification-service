@@ -23,7 +23,7 @@ const NotificationSchema = new mongoose.Schema(
           category_title: String,
           category_type: String,
         },
-        main: {
+        sub: {
           id: ObjectId,
           category_title: String,
           category_type: String,
