@@ -62,18 +62,18 @@ router.post("/", async (req, res) => {
         category: {
           registration: category.registration ? {
             id: category.registration?.id,
-            categoryTitle: category.registration?.categoryTitle,
-            categoryType: category.registration?.categoryType,
+            category_title: category.registration?.categoryTitle,
+            category_type: category.registration?.categoryType,
           } : null,
           main: category.main ? {
             id: category.main?.id,
-            categoryTitle: category.main?.categoryTitle,
-            categoryType: category.main?.categoryType,
+            category_title: category.main?.categoryTitle,
+            category_type: category.main?.categoryType,
           } : null,
           sub: category.sub ? {
             id: category.sub?.id,
-            categoryTitle: category.sub?.categoryTitle,
-            categoryType: category.sub?.categoryType,
+            category_title: category.sub?.categoryTitle,
+            category_type: category.sub?.categoryType,
           } : null,
         },
       },

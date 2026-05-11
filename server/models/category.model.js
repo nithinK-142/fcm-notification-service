@@ -9,7 +9,6 @@ const categorySchema = new mongoose.Schema(
     registration_category: { type: ObjectId },
   },
   {
-    timestamps: true,
     collection: "categorycmts",
     strict: false,
   }
