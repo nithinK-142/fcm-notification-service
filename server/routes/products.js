@@ -82,25 +82,42 @@ router.post("/", async (req, res) => {
       return acc
     }, {})
 
-    const result = docs.map((p) => ({
-      id: p._id,
-      name: p.product_name || "—",
-      skuUic: p.sku_uic || "—",
-      viewCount: p.view_count || 0,
-      avlStock: p.avl_stock || 0,
-      category: {
-        registration: categoriesLookup["Registration Category"]?.[p.registration_category?.toString()] || null,
-        main: categoriesLookup["Main Category"]?.[p.main_category?.toString()] || null,
-        sub: categoriesLookup["Sub Category"]?.[p.sub_category?.toString()] || null,
-      },
-      price: p.listing_price || 0,
-      status: p.product_status || "—",
-      imageUrl: p.product_main_image_file_name || null,
-      createdAt: p.createdAt || null,
-      state: p.listing_state || [],
-      brand: p.brand_name || "—",
-      grade: p.grade || "—",
-    }))
+    const result = docs.map((p) => {
+      const registrationCategory = categoriesLookup["Registration Category"]?.[p.registration_category?.toString()]
+      const mainCategory = categoriesLookup["Main Category"]?.[p.main_category?.toString()]
+      const subCategory = categoriesLookup["Sub Category"]?.[p.sub_category?.toString()]
+      return ({
+        id: p._id,
+        name: p.product_name || "—",
+        skuUic: p.sku_uic || "—",
+        viewCount: p.view_count || 0,
+        avlStock: p.avl_stock || 0,
+        category: {
+          registration: registrationCategory ? {
+            id: registrationCategory._id,
+            categoryTitle: registrationCategory.category_title,
+            categoryType: registrationCategory.category_type,
+          } : null,
+          main: mainCategory ? {
+            id: mainCategory._id,
+            categoryTitle: mainCategory.category_title,
+            categoryType: mainCategory.category_type,
+          } : null,
+          sub: subCategory ? {
+            id: subCategory._id,
+            categoryTitle: subCategory.category_title,
+            categoryType: subCategory.category_type,
+          } : null,
+        },
+        price: p.listing_price || 0,
+        status: p.product_status || "—",
+        imageUrl: p.product_main_image_file_name || null,
+        createdAt: p.createdAt || null,
+        state: p.listing_state || [],
+        brand: p.brand_name || "—",
+        grade: p.grade || "—",
+      })
+    })
 
     return res.json({
       products: result,

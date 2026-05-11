@@ -59,7 +59,23 @@ router.post("/", async (req, res) => {
         grade,
         brand,
         price,
-        category,
+        category: {
+          registration: category.registration ? {
+            id: category.registration?.id,
+            categoryTitle: category.registration?.categoryTitle,
+            categoryType: category.registration?.categoryType,
+          } : null,
+          main: category.main ? {
+            id: category.main?.id,
+            categoryTitle: category.main?.categoryTitle,
+            categoryType: category.main?.categoryType,
+          } : null,
+          sub: category.sub ? {
+            id: category.sub?.id,
+            categoryTitle: category.sub?.categoryTitle,
+            categoryType: category.sub?.categoryType,
+          } : null,
+        },
       },
       body,
       priority,

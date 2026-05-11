@@ -15,18 +15,18 @@ const NotificationSchema = new mongoose.Schema(
       category: {
         registration: {
           id: ObjectId,
-          category_title: String,
-          category_type: String,
+          categoryTitle: String,
+          categoryType: String,
         },
         main: {
           id: ObjectId,
-          category_title: String,
-          category_type: String,
+          categoryTitle: String,
+          categoryType: String,
         },
         sub: {
           id: ObjectId,
-          category_title: String,
-          category_type: String,
+          categoryTitle: String,
+          categoryType: String,
         },
       }
     },

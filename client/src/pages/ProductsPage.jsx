@@ -94,9 +94,9 @@ function ProductDetailModal({ product, open, onClose, onCreateNotification, crea
               <p className="text-xs text-muted-foreground mt-0.5">ID: {product.id}</p>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2.5">
-              {detail("Registration Category", product.category?.registration?.category_title ?? "-")}
-              {detail("Main Category", product.category?.main?.category_title ?? "-")}
-              {detail("Sub Category", product.category?.sub?.category_title ?? "-")}
+              {detail("Registration Category", product.category?.registration?.categoryTitle ?? "-")}
+              {detail("Main Category", product.category?.main?.categoryTitle ?? "-")}
+              {detail("Sub Category", product.category?.sub?.categoryTitle ?? "-")}
               {detail("Brand", product.brand)}
               {detail("Price", product.price != null ? `₹${Number(product.price).toLocaleString()}` : null)}
               {detail("Avl. Stock", product.avlStock)}
@@ -396,7 +396,7 @@ export default function ProductsPage() {
 
                           <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{(p.viewCount ?? 0).toLocaleString()}</td>
                           <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{p.avlStock ?? "—"}</td>
-                          <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{p.category.registration.category_title || "—"}</td>
+                          <td className="px-3 border-r border-border/50 h-[72px] text-sm text-muted-foreground">{p.category.registration.categoryTitle || "—"}</td>
                           <td className="px-3 border-r border-border/50 h-[72px] text-sm font-mono">₹{(p.price ?? 0).toLocaleString()}</td>
 
                           <td className="px-3 h-[72px]" onClick={(e) => e.stopPropagation()}>
