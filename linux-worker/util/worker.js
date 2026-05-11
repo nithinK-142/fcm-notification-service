@@ -1,3 +1,4 @@
+const NodeCache = require("node-cache");
 const { Notification } = require("../models/notification.model.js")
 const { Recipient } = require("../models/recipient.model.js")
 const { sendMulticastNotification } = require("../config/multicast-notification.js");
@@ -5,6 +6,8 @@ const { logWithTimestamp, chunk, delay } = require("./helper.js");
 const { xiorInstance } = require("./xior.js");
 
 let isRunning = false;
+
+const tokenCache = new NodeCache({ stdTTL: 30 * 60, checkperiod: 60 });
 
 async function checkAndCreateBody(productId, isBodyRequired) {
   try {
@@ -18,16 +21,27 @@ async function checkAndCreateBody(productId, isBodyRequired) {
 
 async function getTokens(notification) {
   const states = notification.product.state || []
-
   const hasAllState = states.some((s) => s?.toLowerCase() === "all")
-  const query = { registration_category: notification.product.category.registration.id, }
 
+  const query = { registration_category: notification.product.category.registration.id }
   if (!hasAllState && states.length > 0) {
     query.state = { $in: states.filter((s) => s?.toLowerCase() !== "all") }
   }
 
-  const tokens = await Recipient.find(query, { _id: 0, fcm_token: 1 }).lean();
-  return tokens.map(t => t.fcm_token);
+  const cacheKey = JSON.stringify(query)
+  const cached = tokenCache.get(cacheKey)
+  if (cached !== undefined) {
+    logWithTimestamp(`[getTokens] Cache hit — ${cached.length} tokens`)
+    return cached
+  }
+
+  const docs = await Recipient.find(query, { _id: 0, fcm_token: 1 }).lean();
+  const tokens = docs.map(t => t.fcm_token)
+
+  tokenCache.set(cacheKey, tokens)
+  logWithTimestamp(`[getTokens] Cache miss — fetched and cached ${tokens.length} tokens`)
+
+  return tokens
 }
 
 async function processNotification() {
@@ -48,7 +62,7 @@ async function processNotification() {
         returnDocument: "after",
         sort: {
           priority_rank: 1,  // 0 (execute_now) → 1 (high) → 2 (normal) → 3 (low)
-          created_at: 1,  // oldest first within same rank
+          created_at: 1,     // oldest first within same rank
         },
       }
     )
@@ -73,7 +87,6 @@ async function processNotification() {
 
     const tokens = await getTokens(notification);
 
-    // no recipients
     if (!tokens || !tokens.length) {
       await Notification.updateOne(
         { _id: notification._id },
@@ -87,7 +100,6 @@ async function processNotification() {
           },
         }
       );
-
       return;
     }
 
@@ -111,7 +123,6 @@ async function processNotification() {
 
     for (let i = notification.current_batch || 0; i < batches.length; i++) {
       const batchStart = Date.now();
-
       const batchTokens = batches[i];
 
       let success = 0;
