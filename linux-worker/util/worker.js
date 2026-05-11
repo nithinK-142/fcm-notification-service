@@ -4,6 +4,8 @@ const { sendMulticastNotification } = require("../config/multicast-notification.
 const { logWithTimestamp, chunk, delay } = require("./helper.js");
 const { xiorInstance } = require("./xior.js");
 
+let isRunning = false;
+
 async function checkAndCreateBody(productId, isBodyRequired) {
   try {
     const response = await xiorInstance.post("/worker/check-and-create-body", { id: productId, isBodyRequired })
@@ -29,6 +31,13 @@ async function getTokens(notification) {
 }
 
 async function processNotification() {
+  if (isRunning) {
+    logWithTimestamp("[processNotification] Previous execution still running, skipping this tick.");
+    return;
+  }
+
+  isRunning = true;
+
   try {
     logWithTimestamp("[processNotification] Checking notifications");
 
@@ -165,6 +174,8 @@ async function processNotification() {
     logWithTimestamp("[processNotification] Done:", notification._id);
   } catch (error) {
     logWithTimestamp("[processNotification] Error:", error);
+  } finally {
+    isRunning = false;
   }
 }
 
