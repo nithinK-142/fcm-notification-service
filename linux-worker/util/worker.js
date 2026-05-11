@@ -15,7 +15,7 @@ async function checkAndCreateBody(productId, isBodyRequired) {
     return { status: response.data.message, body: response.data.body }
   } catch (error) {
     logWithTimestamp("[checkAndCreateBody] Error:", error)
-    return "server_error"
+    return { status: "server_error", body: "" }
   }
 }
 
