@@ -185,6 +185,14 @@ async function processNotification() {
     logWithTimestamp("[processNotification] Done:", notification._id);
   } catch (error) {
     logWithTimestamp("[processNotification] Error:", error);
+    try {
+      await Notification.updateOne(
+        { status: { $in: ["locked", "processing"] } },
+        { $set: { status: "server_error", completed_at: new Date() } }
+      );
+    } catch (e) {
+      logWithTimestamp("[processNotification] Failed to mark server_error:", e?.message);
+    }
   } finally {
     isRunning = false;
   }
