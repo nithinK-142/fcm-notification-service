@@ -91,7 +91,8 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
               {detail("Current Batch", n.current_batch)}
               {detail("States", n.product?.state?.join(", "))}
               {detail("Created", n.created_at ? new Date(n.created_at).toLocaleString("en-IN") : null)}
-              {detail("Updated", n.updated_at ? new Date(n.updated_at).toLocaleString("en-IN") : null)}
+              {detail("Started", n.started_at ? new Date(n.started_at).toLocaleString("en-IN") : null)}
+              {n.status === "done" ? (detail("Completed", n.completed_at ? new Date(n.completed_at).toLocaleString("en-IN") : null)) : null}
             </div>
             <div className="px-6 py-4 border-t bg-muted/30 flex items-center gap-3">
               {!alreadySent && (
