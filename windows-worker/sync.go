@@ -74,20 +74,14 @@ func runSync(cfg Config) {
 	localColl := localClient.Database(cfg.LocalDatabase).Collection(cfg.LocalCollection)
 	atlasColl := atlasClient.Database(cfg.AtlasDatabase).Collection(cfg.AtlasCollection)
 
-	users, err := fetchUsers(ctx, localColl, since)
-	if err != nil {
-		log.Printf("ERROR: fetching users: %v", err)
-		return
-	}
-	log.Printf("Fetched %d users from local DB", len(users))
+	// Count is not known upfront with cursor streaming — log will appear after sync.
+	inserted, updated, deleted, errs := syncRecipients(ctx, localColl, atlasColl, fullSync, since, cfg)
 
-	if len(users) == 0 {
+	if inserted+updated == 0 && errs == 0 {
 		log.Println("No changes since last sync, skipping")
 		saveCheckpoint(start)
 		return
 	}
-
-	inserted, updated, deleted, errs := syncRecipients(ctx, atlasColl, users, fullSync, cfg)
 
 	// Only advance checkpoint if no errors — failed syncs retry the same window.
 	if errs == 0 {
@@ -103,10 +97,11 @@ func runSync(cfg Config) {
 	)
 }
 
-// fetchUsers fetches qualifying users from local MongoDB.
-// If since is zero (full sync) it fetches all active users.
-// Otherwise only fetches users modified after since.
-func fetchUsers(ctx context.Context, coll *mongo.Collection, since time.Time) ([]LocalUser, error) {
+// streamUsers opens a cursor over qualifying users and streams each decoded
+// document into the provided channel. The caller owns closing the channel.
+// Using a cursor instead of cursor.All() means we never hold the full user
+// list in memory — only one document at a time is decoded.
+func streamUsers(ctx context.Context, coll *mongo.Collection, since time.Time, out chan<- LocalUser) error {
 	filter := bson.M{
 		"gcm_id":              bson.M{"$exists": true, "$ne": ""},
 		"state":               "Active",
@@ -123,54 +118,45 @@ func fetchUsers(ctx context.Context, coll *mongo.Collection, since time.Time) ([
 		"business_billing_address.business_billing_address_state": 1,
 	}
 
-	cursor, err := coll.Find(ctx, filter, options.Find().SetProjection(projection))
+	cursor, err := coll.Find(ctx, filter,
+		options.Find().
+			SetProjection(projection).
+			SetBatchSize(1000), // fetch 1000 docs per network round-trip
+	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer cursor.Close(ctx)
 
-	var users []LocalUser
-	if err := cursor.All(ctx, &users); err != nil {
-		return nil, err
+	for cursor.Next(ctx) {
+		var u LocalUser
+		if err := cursor.Decode(&u); err != nil {
+			log.Printf("WARNING: skipping user decode error: %v", err)
+			continue
+		}
+		out <- u
 	}
-	return users, nil
+	return cursor.Err()
 }
 
 // syncRecipients is the core sync engine.
 //
 // Upsert phase:
-//   - Splits activeUsers into batches of `batchSize`.
-//   - Sends each batch to a channel consumed by `workerCount` goroutines.
-//   - Each goroutine issues one BulkWrite per batch (N upserts in a single
-//     round-trip instead of N individual UpdateOne calls).
+//   - Streams users from local MongoDB via cursor (constant memory regardless of scale).
+//   - Deduplicates by gcm_id on the fly (keeps latest updatedAt per token).
+//   - Sends BulkWrite batches to workerCount goroutines via a channel.
 //
-// Delete phase:
-//   - Streams Atlas recipient user_ids through a cursor (no full load into RAM).
-//   - Accumulates IDs not in the active set, then issues batched DeleteMany calls.
+// Delete phase (full sync only):
+//   - Streams Atlas recipients cursor, diffs against active token set.
+//   - Batched DeleteMany — never loads all recipient IDs into RAM.
 func syncRecipients(
 	ctx context.Context,
-	coll *mongo.Collection,
-	users []LocalUser,
+	localColl *mongo.Collection,
+	atlasColl *mongo.Collection,
 	fullSync bool,
+	since time.Time,
 	cfg Config,
 ) (inserted, updated, deleted, errs int) {
-
-	// Deduplicate by gcm_id — keep the user with the latest updatedAt.
-	// Two users sharing a token (recycled device) would cause a unique index
-	// conflict; only the most recent owner should hold the token in Atlas.
-	deduped := make(map[string]LocalUser, len(users))
-	for _, u := range users {
-		existing, seen := deduped[u.GcmID]
-		if !seen || u.UpdatedAt.After(existing.UpdatedAt) {
-			deduped[u.GcmID] = u
-		}
-	}
-
-	// Build active token set for O(1) lookup during delete phase.
-	activeTokens := make(map[string]struct{}, len(deduped))
-	for token := range deduped {
-		activeTokens[token] = struct{}{}
-	}
 
 	// ── Upsert phase ────────────────────────────────────────────────────────
 
@@ -188,7 +174,7 @@ func syncRecipients(
 		go func() {
 			defer wg.Done()
 			for batch := range batchCh {
-				ins, upd, e := executeBulkUpsert(ctx, coll, batch)
+				ins, upd, e := executeBulkUpsert(ctx, atlasColl, batch)
 				atomic.AddInt64(&atomicInserted, int64(ins))
 				atomic.AddInt64(&atomicUpdated, int64(upd))
 				atomic.AddInt64(&atomicErrs, int64(e))
@@ -196,9 +182,28 @@ func syncRecipients(
 		}()
 	}
 
+	// Stream users, deduplicate on the fly, feed batches to workers.
+	// deduped holds only the winning LocalUser per token — still bounded
+	// by the number of unique tokens, but built incrementally, never all at once.
+	deduped := make(map[string]LocalUser)
+	userCh := make(chan LocalUser, 500)
+	streamErr := make(chan error, 1)
+
+	go func() {
+		streamErr <- streamUsers(ctx, localColl, since, userCh)
+		close(userCh)
+	}()
+
 	now := time.Now()
 	batch := make([]mongo.WriteModel, 0, cfg.BatchSize)
-	for _, u := range deduped {
+
+	for u := range userCh {
+		// Dedup: if same token seen before, keep the newer one.
+		if existing, seen := deduped[u.GcmID]; seen && !u.UpdatedAt.After(existing.UpdatedAt) {
+			continue
+		}
+		deduped[u.GcmID] = u
+
 		category := primitive.NilObjectID
 		if len(u.Category) > 0 {
 			category = u.Category[0]
@@ -232,49 +237,61 @@ func syncRecipients(
 	close(batchCh)
 	wg.Wait()
 
+	if err := <-streamErr; err != nil {
+		log.Printf("ERROR: user cursor stream: %v", err)
+		errs++
+	}
+
 	inserted = int(atomic.LoadInt64(&atomicInserted))
 	updated = int(atomic.LoadInt64(&atomicUpdated))
-	errs = int(atomic.LoadInt64(&atomicErrs))
+	errs += int(atomic.LoadInt64(&atomicErrs))
 
 	// ── Delete phase — full sync only ────────────────────────────────────────
-	// Incremental runs only have a subset of users. Diffing a subset against
-	// all Atlas recipients would incorrectly delete the rest as stale.
+	// Incremental runs only have a subset of users. Diffing against all Atlas
+	// recipients would incorrectly mark the rest as stale.
 	if !fullSync {
 		return
 	}
 
-	cursor, err := coll.Find(ctx, bson.M{},
-		options.Find().SetProjection(bson.M{"_id": 1, "fcm_token": 1}),
+	// Build active token set from the deduped map (already in memory).
+	activeTokens := make(map[string]struct{}, len(deduped))
+	for token := range deduped {
+		activeTokens[token] = struct{}{}
+	}
+
+	recipCursor, err := atlasColl.Find(ctx, bson.M{},
+		options.Find().
+			SetProjection(bson.M{"_id": 1, "fcm_token": 1}).
+			SetBatchSize(1000),
 	)
 	if err != nil {
 		log.Printf("ERROR: listing atlas recipients for delete phase: %v", err)
 		errs++
 		return
 	}
-	defer cursor.Close(ctx)
+	defer recipCursor.Close(ctx)
 
 	stale := make([]primitive.ObjectID, 0, cfg.BatchSize)
-	for cursor.Next(ctx) {
+	for recipCursor.Next(ctx) {
 		var rec struct {
 			ID       primitive.ObjectID `bson:"_id"`
 			FcmToken string             `bson:"fcm_token"`
 		}
-		if err := cursor.Decode(&rec); err != nil {
+		if err := recipCursor.Decode(&rec); err != nil {
 			continue
 		}
 		if _, active := activeTokens[rec.FcmToken]; !active {
 			stale = append(stale, rec.ID)
 		}
-
 		if len(stale) == cfg.BatchSize {
-			d, e := executeDeleteBatch(ctx, coll, stale)
+			d, e := executeDeleteBatch(ctx, atlasColl, stale)
 			deleted += d
 			errs += e
 			stale = stale[:0]
 		}
 	}
 	if len(stale) > 0 {
-		d, e := executeDeleteBatch(ctx, coll, stale)
+		d, e := executeDeleteBatch(ctx, atlasColl, stale)
 		deleted += d
 		errs += e
 	}
