@@ -51,7 +51,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
   if (!n) return null
   const isSending = actionId === n._id + "-send"
   const isDeleting = actionId === n._id + "-del"
-  const alreadySent = n.status === "sent"
+  const alreadySent = n.status === "done"
 
   const detail = (label, value) => (
     <div key={label} className="flex gap-2 text-sm">
@@ -77,7 +77,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
                 <p className="text-xs text-muted-foreground mt-0.5 font-mono">{n._id}</p>
               </div>
               <div className="flex gap-2 shrink-0">
-                <Badge variant={n.status === "sent" ? "success" : "secondary"}>{n.status}</Badge>
+                <Badge variant={n.status === "done" ? "success" : "secondary"}>{n.status}</Badge>
                 <Badge variant={n.priority === "high" ? "destructive" : n.priority === "normal" ? "warning" : "success"}>{n.priority}</Badge>
               </div>
             </div>
@@ -384,7 +384,7 @@ export default function NotificationsPage() {
                         </td>
 
                         <td className="px-3 border-r border-border/50 h-[72px]">
-                          <Badge variant={n.status === "sent" ? "success" : "secondary"}>{n.status}</Badge>
+                          <Badge variant={n.status === "done" ? "success" : "secondary"}>{n.status}</Badge>
                         </td>
 
                         <td className="px-3 border-r border-border/50 h-[72px] text-sm">{n.sent_count}</td>
@@ -409,7 +409,7 @@ export default function NotificationsPage() {
 
                         <td className="px-2 h-[72px]">
                           <div className="flex items-center justify-end gap-0.5">
-                            {n.status !== "sent" && (
+                            {n.status !== "done" && (
                               <Button
                                 size="icon"
                                 variant="ghost"
