@@ -80,8 +80,14 @@ async function sendMulticastNotification(notification, tokens) {
                 const msg = String(error?.message || error);
                 logWithTimestamp(`[sendMulticastNotification] Error: FCM attempt ${attempt} failed:`, msg);
 
-                // reset http2 session if GOAWAY/ping_timeout
-                if (msg.includes("GOAWAY") || msg.includes("ping_timeout")) {
+                // reset http2 session on any session-level error including timeout
+                if (
+                    msg.includes("GOAWAY") ||
+                    msg.includes("ping_timeout") ||
+                    msg.includes("FCM timeout") ||
+                    msg.includes("ECONNRESET") ||
+                    msg.includes("RST_STREAM")
+                ) {
                     await resetFirebase();
                 }
 
