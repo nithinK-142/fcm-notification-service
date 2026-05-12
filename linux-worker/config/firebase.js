@@ -2,29 +2,36 @@ const path = require("path");
 const admin = require("firebase-admin");
 const { logWithTimestamp } = require("../util/helper.js");
 
-let initialized = false;
+let currentApp = null;
 
 async function initFirebase() {
-    if (initialized && admin.apps.length) return admin;
+    if (currentApp) return currentApp;
 
     const serviceAccount = require(path.join(__dirname, "./firebase.json"));
+    currentApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-
-    initialized = true;
     logWithTimestamp("[initFirebase] Firebase initialized");
-    return admin;
+    return currentApp;
+}
+
+// Always returns the current live app instance.
+// Use this instead of admin.app() which may return a stale/deleted app.
+function getApp() {
+    return currentApp;
 }
 
 async function resetFirebase() {
+    logWithTimestamp("[resetFirebase] Resetting Firebase (HTTP/2 recovery)...");
     try {
-        logWithTimestamp("[resetFirebase] Resetting Firebase (HTTP2 recovery)...");
-        await Promise.all(admin.apps.map((app) => app.delete()));
+        if (currentApp) {
+            await currentApp.delete();
+        }
     } catch (e) {
-        // ignore
+        // ignore teardown errors
     }
-    initialized = false;
+    currentApp = null;
     await initFirebase();
+    logWithTimestamp("[resetFirebase] Firebase reset complete");
 }
 
-module.exports = { admin, initFirebase, resetFirebase };
+module.exports = { admin, initFirebase, getApp, resetFirebase };

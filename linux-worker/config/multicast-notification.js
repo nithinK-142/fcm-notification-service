@@ -1,5 +1,4 @@
-const { getMessaging } = require("firebase-admin/messaging");
-const { resetFirebase } = require("./firebase.js");
+const { getApp, resetFirebase } = require("./firebase.js");
 const { delay, logWithTimestamp } = require("../util/helper.js");
 
 async function withTimeout(promise, ms) {
@@ -33,8 +32,6 @@ async function sendMulticastNotification(notification, tokens) {
         logWithTimestamp("[sendMulticastNotification] tokens length",tokens.length)
         if (!tokens?.length) return null;
         
-        const messaging = getMessaging();
-
         const title = notification.product.name;
         const body = notification.body;
         const image = notification.product.image_url || "";
@@ -75,7 +72,10 @@ async function sendMulticastNotification(notification, tokens) {
         
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                return await withTimeout(messaging.sendEachForMulticast(message), 60000);
+                // getApp().messaging() always returns messaging bound to the current live app.
+                // Unlike getMessaging() from firebase-admin/messaging which caches the first
+                // app instance and never updates after a reset.
+                return await withTimeout(getApp().messaging().sendEachForMulticast(message), 60000);
             } catch (error) {
                 const msg = String(error?.message || error);
                 logWithTimestamp(`[sendMulticastNotification] Error: FCM attempt ${attempt} failed:`, msg);
