@@ -25,7 +25,20 @@ router.get("/", async (req, res) => {
 
     const skip = (Number(page) - 1) * Number(limit)
     const total = await Notification.countDocuments(query)
-    const result = await Notification.find(query)
+    const result = await Notification.find(query, {
+      _id: 1,
+      body: 1,
+      status: 1,
+      priority: 1,
+      sent_count: 1,
+      failed_count: 1,
+      current_batch: 1,
+      created_at: 1,
+      updated_at: 1,
+      "product.name": 1,
+      "product.image_url": 1,
+      "product.state": 1,
+    })
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(Number(limit))
