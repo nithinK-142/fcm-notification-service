@@ -31,7 +31,7 @@ const NotificationSchema = new mongoose.Schema(
       }
     },
 
-    body: { type: String, default: "Now Live!" },
+    body: { type: String },
     status: { type: String, default: "pending" },
 
     execute_now: { type: Boolean, default: false },
