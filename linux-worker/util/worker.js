@@ -9,6 +9,8 @@ let isRunning = false;
 
 const tokenCache = new NodeCache({ stdTTL: 30 * 60, checkperiod: 60 });
 
+const CONCURRENT_BATCHES = process.env.CONCURRENT_BATCHES || 3;
+
 async function checkAndCreateBody(productId, isBodyRequired) {
   try {
     const response = await xiorInstance.post("/worker/check-and-create-body", { id: productId, isBodyRequired })
@@ -129,52 +131,64 @@ async function processNotification() {
       logWithTimestamp(`[processNotification] Resuming from batch ${resumeFrom + 1}/${batches.length}`);
     }
 
-    for (let i = resumeFrom; i < batches.length; i++) {
-      const batchStart = Date.now();
-      const batchTokens = batches[i];
+    logWithTimestamp(
+      `[processNotification] Sending to ${tokens.length} recipients` +
+      ` in ${batches.length} batches (${CONCURRENT_BATCHES} concurrent)`
+    );
 
-      let success = 0;
-      let failure = 0;
+    // Process in windows of CONCURRENT_BATCHES.
+    // Promise.allSettled — one failure in a window doesn't abort the rest.
+    // One DB write per window instead of per batch.
+    for (let i = resumeFrom; i < batches.length; i += CONCURRENT_BATCHES) {
+      const window = batches.slice(i, i + CONCURRENT_BATCHES);
 
-      const response = await sendMulticastNotification(notification, batchTokens);
+      const results = await Promise.allSettled(
+        window.map((batchTokens, wi) => {
+          const batchStart = Date.now();
+          return sendMulticastNotification(notification, batchTokens).then(response => {
+            let success = 0;
+            let failure = 0;
+            if (!response || !Array.isArray(response.responses)) {
+              failure = batchTokens.length;
+            } else {
+              response.responses.forEach(r => { if (r.success) success++; else failure++; });
+            }
+            return {
+              batch_no: i + wi + 1,
+              tokens_count: batchTokens.length,
+              success,
+              failure,
+              duration_ms: Date.now() - batchStart,
+            };
+          });
+        })
+      );
 
-      if (!response || !Array.isArray(response.responses)) {
-        failure = batchTokens.length;
-      } else {
-        response.responses.forEach(r => {
-          if (r.success) success++;
-          else failure++;
-        });
-      }
-
-      totalSuccess += success;
-      totalFailure += failure;
-
-      const duration = Date.now() - batchStart;
+      const windowBatches = results.map((r, w) => {
+        const val = r.status === "fulfilled" && r.value
+          ? r.value
+          : { batch_no: i + w + 1, tokens_count: window[w].length, success: 0, failure: window[w].length, duration_ms: 0 };
+        totalSuccess += val.success;
+        totalFailure += val.failure;
+        return val;
+      });
 
       await Notification.updateOne(
         { _id: notification._id },
         {
-          $push: {
-            batches: {
-              batch_no: i + 1,
-              tokens_count: batchTokens.length,
-              success,
-              failure,
-              duration_ms: duration,
-            },
-          },
+          $push: { batches: { $each: windowBatches } },
           $set: {
             sent_count: totalSuccess,
             failed_count: totalFailure,
-            current_batch: i + 1,
+            current_batch: i + window.length,
           },
         }
       );
 
-      logWithTimestamp(`[processNotification] Batch ${i + 1}/${batches.length} completed`);
-
-      await delay(300);
+      logWithTimestamp(
+        `[processNotification] Batches ${i + 1}–${i + window.length}/${batches.length} done` +
+        ` | sent: ${totalSuccess} failed: ${totalFailure}`
+      );
     }
 
     const totalDuration = Date.now() - startTime;
@@ -190,7 +204,11 @@ async function processNotification() {
       }
     );
 
-    logWithTimestamp("[processNotification] Done:", notification._id);
+    logWithTimestamp(
+      `[processNotification] Done: ${notification._id}` +
+      ` | sent: ${totalSuccess} failed: ${totalFailure}` +
+      ` | took: ${(totalDuration / 1000).toFixed(1)}s`
+    );
   } catch (error) {
     logWithTimestamp("[processNotification] Error:", error);
     try {
