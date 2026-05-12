@@ -24,7 +24,7 @@ async function resetFirebase() {
         // ignore
     }
     initialized = false;
-    initFirebase();
+    await initFirebase();
 }
 
 module.exports = { admin, initFirebase, resetFirebase };
