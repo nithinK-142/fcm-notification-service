@@ -104,6 +104,13 @@ async function processNotification() {
     }
 
     const batches = chunk(tokens, 200);
+    const resumeFrom = notification.current_batch || 0;
+    const isResume = resumeFrom > 0;
+
+    // On resume: carry forward existing counts so sent/failed accumulate correctly.
+    // On fresh start: reset everything and record started_at.
+    let totalSuccess = isResume ? (notification.sent_count || 0) : 0;
+    let totalFailure = isResume ? (notification.failed_count || 0) : 0;
 
     await Notification.updateOne(
       { _id: notification._id },
@@ -112,16 +119,17 @@ async function processNotification() {
           status: "processing",
           total_recipients: tokens.length,
           batch_count: batches.length,
-          started_at: new Date(),
           body,
+          ...(isResume ? {} : { started_at: new Date() }),
         },
       }
     );
 
-    let totalSuccess = 0;
-    let totalFailure = 0;
+    if (isResume) {
+      logWithTimestamp(`[processNotification] Resuming from batch ${resumeFrom + 1}/${batches.length}`);
+    }
 
-    for (let i = notification.current_batch || 0; i < batches.length; i++) {
+    for (let i = resumeFrom; i < batches.length; i++) {
       const batchStart = Date.now();
       const batchTokens = batches[i];
 
