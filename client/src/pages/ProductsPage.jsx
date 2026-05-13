@@ -119,7 +119,7 @@ function ProductDetailModal({ product, open, onClose, onCreateNotification, crea
             <div className="px-6 py-4 border-t bg-muted/30 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Create Notification</p>
               <Input
-                placeholder="Notification body (e.g. Now LIVE)"
+                placeholder={`Notification body (e.g. Now LIVE ${product.price})`}
                 className="h-8 text-sm"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
@@ -387,7 +387,7 @@ export default function ProductsPage() {
 
                           <td className="px-3 border-r border-border/50 h-[72px]" onClick={(e) => e.stopPropagation()}>
                             <Input
-                              placeholder="Now LIVE"
+                              placeholder={`Now LIVE ${p.price ?? 0}`}
                               className="h-8 text-xs w-full"
                               value={notifBodies[p.id] || ""}
                               onChange={(e) => setNotifBodies((prev) => ({ ...prev, [p.id]: e.target.value }))}
