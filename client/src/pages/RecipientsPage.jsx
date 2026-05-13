@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { getRecipients } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Skel, SkeletonGrid } from "@/components/ui/skeletons"
 import { Loader2, RefreshCw, Users, MapPin, Tag, RefreshCcw } from "lucide-react"
 import { cn, formatStateName } from "@/lib/utils"
 
@@ -56,18 +57,6 @@ function SectionHeader({ icon: Icon, title, count, sort, onSortChange }) {
           Count {sort === "COUNT_DESC" ? "↓" : sort === "COUNT_ASC" ? "↑" : ""}
         </Button>
       </div>
-    </div>
-  )
-}
-
-function Skel({ className }) {
-  return <div className={cn("animate-pulse rounded-lg bg-muted/60", className)} />
-}
-
-function SkeletonGrid({ count = 6 }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-      {[...Array(count)].map((_, i) => <Skel key={i} className="h-24" />)}
     </div>
   )
 }

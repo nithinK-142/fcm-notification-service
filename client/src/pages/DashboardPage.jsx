@@ -3,7 +3,8 @@ import { Link } from "react-router-dom"
 import { getDashboardStats } from "@/lib/api"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Package, Bell, Users, TrendingUp, Send, ArrowRight, Loader2 } from "lucide-react"
+import { Skel } from "@/components/ui/skeletons"
+import { Package, Bell, Users, TrendingUp, Send, ArrowRight } from "lucide-react"
 
 function StatCard({ title, value, subtitle, icon: Icon, iconColor, iconBg, to, trend }) {
   return (
@@ -46,10 +47,6 @@ function SectionHeader({ title, to }) {
       </Link>
     </div>
   )
-}
-
-function Skel({ className }) {
-  return <div className={`animate-pulse rounded-lg bg-muted/60 ${className}`} />
 }
 
 export default function DashboardPage() {

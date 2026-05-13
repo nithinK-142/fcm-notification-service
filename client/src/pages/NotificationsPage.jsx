@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skel } from "@/components/ui/skeletons"
 import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight, Pencil } from "lucide-react"
 import { cn, formatDuration } from "@/lib/utils"
 import toast from "react-hot-toast"
@@ -123,7 +123,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
     <div key={label} className="flex gap-2 text-sm">
       <span className="text-muted-foreground w-32 shrink-0">{label}</span>
       {loadingDetails && showSkeleton ? (
-        <Skeleton className="h-4 w-32" />
+        <Skel className="h-4 w-32" />
       ) : (
         <span className="font-medium break-all">{value ?? "—"}</span>
       )}
@@ -149,8 +149,8 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
               <div className="flex gap-2 shrink-0">
                 {loadingDetails ? (
                   <>
-                    <Skeleton className="h-5 w-16" />
-                    <Skeleton className="h-5 w-16" />
+                    <Skel className="h-5 w-16" />
+                    <Skel className="h-5 w-16" />
                   </>
                 ) : (
                   <>
@@ -177,8 +177,8 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
               {displayData.status === "done" ? detail("Duration", formatDuration(displayData.duration_ms)) : null}
               {loadingDetails ? (
                 <div className="space-y-2 mt-4">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-20 w-full" />
+                  <Skel className="h-4 w-20" />
+                  <Skel className="h-20 w-full" />
                 </div>
               ) : displayData.batches ? (
                 <div className="mt-4">
