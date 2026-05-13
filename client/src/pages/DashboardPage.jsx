@@ -77,16 +77,6 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
         <StatCard
-          title="Total Products"
-          value={stats?.totalProducts?.toLocaleString()}
-          subtitle="Registered in catalog"
-          icon={Package}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-50 dark:bg-blue-950/50"
-          to="/products"
-          trend={`${stats?.activeProducts?.toLocaleString() ?? 0} active with stock`}
-        />
-        <StatCard
           title="Notifications"
           value={stats?.totalNotifications?.toLocaleString()}
           subtitle="Created campaigns"
@@ -96,6 +86,16 @@ export default function DashboardPage() {
           to="/notifications"
           trend={`${stats?.sentNotifications?.toLocaleString() ?? 0} done`}
         />
+        <StatCard
+          title="Total Products"
+          value={stats?.totalProducts?.toLocaleString()}
+          subtitle="Registered in catalog"
+          icon={Package}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50 dark:bg-blue-950/50"
+          to="/products"
+          trend={`${stats?.activeProducts?.toLocaleString() ?? 0} active with stock`}
+        />
         {stats?.totalRecipients != null && (
           <StatCard
             title="Recipients"
@@ -104,7 +104,8 @@ export default function DashboardPage() {
             icon={Users}
             iconColor="text-emerald-600"
             iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-            to="/notifications"
+            to="/recipients"
+            trend={`${stats?.updatedToday?.toLocaleString() ?? 0} updated today`}
           />
         )}
       </div>
@@ -131,9 +132,9 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <Badge variant={
-                        n.status === "done"         ? "success"   :
-                        n.status === "processing"   ? "warning"   :
-                        n.status === "server_error" ? "destructive" : "secondary"
+                        n.status === "done" ? "success" :
+                          n.status === "processing" ? "warning" :
+                            n.status === "server_error" ? "destructive" : "secondary"
                       }>
                         {n.status}
                       </Badge>

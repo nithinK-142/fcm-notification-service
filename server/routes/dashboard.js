@@ -2,7 +2,7 @@ const { Router } = require("express");
 const { getModels } = require("../models/models.js");
 
 const router = Router();
-const { Product, Notification } = getModels();
+const { Product, Notification, Recipient } = getModels();
 
 router.get("/stats", async (req, res) => {
   try {
@@ -12,6 +12,7 @@ router.get("/stats", async (req, res) => {
       totalNotifications,
       sentNotifications,
       totalRecipients,
+      updatedToday,
       recentNotifications,
       recentProducts,
     ] = await Promise.all([
@@ -19,7 +20,13 @@ router.get("/stats", async (req, res) => {
       Product.countDocuments({ product_status: "Active", avl_stock: { $gt: 0 } }),
       Notification.countDocuments(),
       Notification.countDocuments({ status: "done" }),
-      Promise.resolve(null),
+      Recipient.countDocuments(),
+      Recipient.countDocuments({
+        updated_at: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999))
+        }
+      }),
 
       Notification.find()
         .sort({ created_at: -1 })
@@ -44,6 +51,7 @@ router.get("/stats", async (req, res) => {
       totalNotifications,
       sentNotifications,
       totalRecipients,
+      updatedToday,
       recentNotifications: recentNotifications.map((n) => ({
         id: n._id,
         title: n.product?.name,

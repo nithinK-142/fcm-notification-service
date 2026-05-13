@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { ObjectId } = require("../util/constants");
 
-const RecipientsSchema = new mongoose.Schema(
+const RecipientSchema = new mongoose.Schema(
   {
     user_id: {
       type: ObjectId,
@@ -36,11 +36,11 @@ const RecipientsSchema = new mongoose.Schema(
   }
 );
 
-RecipientsSchema.index({
+RecipientSchema.index({
   state: 1,
   registration_category: 1,
 });
 
-const Recipient = mongoose.model("recipients", RecipientsSchema);
+const Recipient = mongoose.model("recipients", RecipientSchema);
 
 module.exports = { Recipient };
