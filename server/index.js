@@ -36,6 +36,7 @@ async function startServer() {
     const authRoutes = require("./routes/auth.js");
     const productRoutes = require("./routes/products.js");
     const notificationRoutes = require("./routes/notifications.js");
+    const recipientRoutes = require("./routes/recipients.js");
     const workerRoutes = require("./routes/worker.js");
     const dashboardRoutes = require("./routes/dashboard.js");
 
@@ -46,6 +47,7 @@ async function startServer() {
     // Protected routes
     app.use("/api/products", authenticate, productRoutes);
     app.use("/api/notifications", authenticate, notificationRoutes);
+    app.use("/api/recipients", authenticate, recipientRoutes);
     app.use("/api/dashboard", authenticate, dashboardRoutes);
 
     app.listen(PORT, () => {

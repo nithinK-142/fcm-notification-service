@@ -19,3 +19,18 @@ export function formatDuration(ms) {
 
   return `${minutes}m ${seconds}s`
 }
+
+const SPECIAL_CAPS = new Set(["and", "the", "of", "in", "at",])
+const ACRONYMS = new Set(["ut", "nct"])
+
+export function formatStateName(raw) {
+  if (!raw) return "—"
+  return raw
+    .split(" ")
+    .map((word, i) => {
+      if (ACRONYMS.has(word)) return word.toUpperCase()
+      if (i > 0 && SPECIAL_CAPS.has(word)) return word
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(" ")
+}
