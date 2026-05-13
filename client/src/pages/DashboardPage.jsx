@@ -48,6 +48,10 @@ function SectionHeader({ title, to }) {
   )
 }
 
+function Skel({ className }) {
+  return <div className={`animate-pulse rounded-lg bg-muted/60 ${className}`} />
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -61,8 +65,103 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="p-8 max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">Overview of your B2R push notification platform</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Notifications</p>
+                  <Skel className="h-9 w-16 mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1.5">Created campaigns</p>
+                  <Skel className="h-3 w-20 mt-2" />
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center shrink-0">
+                  <Bell className="w-6 h-6 text-violet-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Total Products</p>
+                  <Skel className="h-9 w-16 mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1.5">Registered in catalog</p>
+                  <Skel className="h-3 w-28 mt-2" />
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                  <Package className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Recipients</p>
+                  <Skel className="h-9 w-16 mt-1" />
+                  <p className="text-xs text-muted-foreground mt-1.5">Registered FCM tokens</p>
+                  <Skel className="h-3 w-28 mt-2" />
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                  <Users className="w-6 h-6 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-foreground">Recent Notifications</h2>
+            <span className="text-xs text-primary font-medium">View all</span>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-6 py-4 border-b last:border-0">
+                  <Skel className="w-10 h-10 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skel className="h-4 w-40" />
+                    <Skel className="h-3 w-56" />
+                  </div>
+                  <Skel className="h-5 w-16 rounded-full shrink-0" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-foreground">Recent Products</h2>
+            <span className="text-xs text-primary font-medium">View all</span>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-6 py-4 border-b last:border-0">
+                  <Skel className="w-10 h-10 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skel className="h-4 w-44" />
+                    <Skel className="h-3 w-32" />
+                  </div>
+                  <Skel className="h-4 w-16 shrink-0" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
