@@ -26,15 +26,35 @@ function StatCard({ title, count, subtitle, dim }) {
   )
 }
 
-function SectionHeader({ icon: Icon, title, count }) {
+function SectionHeader({ icon: Icon, title, count, sort, onSortChange }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-primary" />
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <p className="text-xs text-muted-foreground">{count} {count === 1 ? "entry" : "entries"}</p>
+        </div>
       </div>
-      <div>
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <p className="text-xs text-muted-foreground">{count} {count === 1 ? "entry" : "entries"}</p>
+      <div className="flex items-center gap-1">
+        <Button
+          variant={sort === "ALPHA_ASC" || sort === "ALPHA_DESC" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-7 gap-1 text-xs"
+          onClick={() => onSortChange(prev => prev === "ALPHA_ASC" ? "ALPHA_DESC" : "ALPHA_ASC")}
+        >
+          A-Z {sort === "ALPHA_ASC" ? "↑" : sort === "ALPHA_DESC" ? "↓" : ""}
+        </Button>
+        <Button
+          variant={sort === "COUNT_DESC" || sort === "COUNT_ASC" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-7 gap-1 text-xs"
+          onClick={() => onSortChange(prev => prev === "COUNT_DESC" ? "COUNT_ASC" : "COUNT_DESC")}
+        >
+          Count {sort === "COUNT_DESC" ? "↓" : sort === "COUNT_ASC" ? "↑" : ""}
+        </Button>
       </div>
     </div>
   )
@@ -52,10 +72,27 @@ function SkeletonGrid({ count = 6 }) {
   )
 }
 
+function sortData(data, sort, keyFn) {
+  const sorted = [...data]
+  switch (sort) {
+    case "COUNT_ASC":
+      return sorted.sort((a, b) => keyFn(a).count - keyFn(b).count)
+    case "ALPHA_ASC":
+      return sorted.sort((a, b) => keyFn(a).label.localeCompare(keyFn(b).label))
+    case "ALPHA_DESC":
+      return sorted.sort((a, b) => keyFn(b).label.localeCompare(keyFn(a).label))
+    case "COUNT_DESC":
+    default:
+      return sorted.sort((a, b) => keyFn(b).count - keyFn(a).count)
+  }
+}
+
 export default function RecipientsPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [stateSort, setStateSort] = useState("COUNT_DESC")
+  const [categorySort, setCategorySort] = useState("COUNT_DESC")
 
   const fetchData = async () => {
     setLoading(true)
@@ -76,6 +113,8 @@ export default function RecipientsPage() {
   const states = data?.recipientsByState ?? []
   const categories = data ? Object.entries(data.recipientsByRegCategory) : []
   const maxState = states[0]?.count ?? 1
+  const sortedStates = sortData(states, stateSort, (item) => ({ count: item.count, label: item.state }))
+  const sortedCategories = sortData(categories, categorySort, ([, { count, categoryTitle }]) => ({ count, label: categoryTitle }))
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
@@ -121,12 +160,14 @@ export default function RecipientsPage() {
           icon={Tag}
           title="By Registration Category"
           count={categories.length}
+          sort={categorySort}
+          onSortChange={setCategorySort}
         />
         {loading ? (
           <SkeletonGrid count={3} />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {categories.map(([id, { count, categoryTitle }]) => (
+            {sortedCategories.map(([id, { count, categoryTitle }]) => (
               <StatCard key={id} title={categoryTitle} count={count} subtitle="registered" dim={Math.round((count / (data?.totalRecipients || 1)) * 100)} />
             ))}
           </div>
@@ -138,12 +179,14 @@ export default function RecipientsPage() {
           icon={MapPin}
           title="By State / UT"
           count={states.length}
+          sort={stateSort}
+          onSortChange={setStateSort}
         />
         {loading ? (
           <SkeletonGrid count={18} />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {states.map(({ state, count }) => (
+            {sortedStates.map(({ state, count }) => (
               <StatCard key={state} title={formatStateName(state)} count={count} dim={Math.round((count / maxState) * 100)} />
             ))}
           </div>
