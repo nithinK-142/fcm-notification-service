@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from "react"
-import { getNotifications, deleteNotification, sendNotification, updateNotification } from "@/lib/api"
+import { getNotifications, deleteNotification, sendNotification, updateNotification, getNotification } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Search, Trash2, Loader2, Send, RefreshCw, Package, ChevronLeft, ChevronRight, Pencil } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatDuration } from "@/lib/utils"
 import toast from "react-hot-toast"
 import { confirmToast } from "@/components/ConfirmToast"
 
@@ -46,17 +47,86 @@ function Pagination({ page, totalPages, pageSize, onPageChange, onPageSizeChange
   )
 }
 
+function BatchesDetail({ batches }) {
+  if (!batches || batches.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-sm font-semibold">Batches ({batches.length})</h4>
+      <div className="space-y-2 max-h-48 overflow-y-auto">
+        {batches.map((batch, index) => (
+          <div key={batch._id?.$oid || index} className="border rounded-lg p-3 bg-muted/30">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex gap-2">
+                <span className="text-muted-foreground">Batch No:</span>
+                <span className="font-medium">{batch.batch_no ?? "—"}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-muted-foreground">Tokens:</span>
+                <span className="font-medium">{batch.tokens_count ?? "—"}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-muted-foreground">Success:</span>
+                <span className="font-medium text-green-600">{batch.success ?? "—"}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-muted-foreground">Failure:</span>
+                <span className="font-medium text-red-600">{batch.failure ?? "—"}</span>
+              </div>
+              <div className="flex gap-2 col-span-2">
+                <span className="text-muted-foreground">Duration:</span>
+                <span className="font-medium">{formatDuration(batch.duration_ms)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Notification Detail Modal ────────────────────────────────────────────────
 function NotificationDetailModal({ notification: n, open, onClose, onSend, onDelete, actionId }) {
+  const [detailData, setDetailData] = useState(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
+
+  useEffect(() => {
+    if (open && n?._id) {
+      fetchNotificationDetails(n._id)
+    } else {
+      setDetailData(null)
+    }
+  }, [open, n?._id])
+
+  const fetchNotificationDetails = async (id) => {
+    setLoadingDetails(true)
+    try {
+      const res = await getNotification(id)
+      setDetailData(res.data)
+    } catch (error) {
+      console.error("Failed to fetch notification details:", error)
+      toast.error("Failed to load notification details")
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
   if (!n) return null
   const isSending = actionId === n._id + "-send"
   const isDeleting = actionId === n._id + "-del"
   const alreadySent = n.status === "done"
+  const productName = n.product?.name
+  const imageUrl = n.product?.image_url
+  const displayData = detailData || n
 
-  const detail = (label, value) => (
+  const detail = (label, value, showSkeleton = true) => (
     <div key={label} className="flex gap-2 text-sm">
       <span className="text-muted-foreground w-32 shrink-0">{label}</span>
-      <span className="font-medium break-all">{value ?? "—"}</span>
+      {loadingDetails && showSkeleton ? (
+        <Skeleton className="h-4 w-32" />
+      ) : (
+        <span className="font-medium break-all">{value ?? "—"}</span>
+      )}
     </div>
   )
 
@@ -65,10 +135,10 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
       <DialogContent className="max-w-3xl p-0 overflow-hidden">
         <div className="flex h-[520px]">
           <div className="w-72 shrink-0 bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center gap-3 p-4">
-            {n.product?.image_url
-              ? <img src={n.product.image_url} alt={n.product?.name} className="w-full h-64 object-contain rounded-lg" />
+            {imageUrl
+              ? <img src={imageUrl} alt={productName} className="w-full h-64 object-contain rounded-lg" />
               : <Package className="w-16 h-16 text-slate-300" />}
-            <p className="text-xs text-muted-foreground text-center leading-snug px-2">{n.product?.name}</p>
+            <p className="text-xs text-muted-foreground text-center leading-snug px-2">{productName}</p>
           </div>
           <div className="flex flex-col flex-1 min-w-0">
             <div className="px-6 pt-5 pb-4 border-b flex items-start justify-between gap-4">
@@ -77,22 +147,44 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
                 <p className="text-xs text-muted-foreground mt-0.5 font-mono">{n._id}</p>
               </div>
               <div className="flex gap-2 shrink-0">
-                <Badge variant={n.status === "done" ? "success" : "secondary"}>{n.status}</Badge>
-                <Badge variant={n.priority === "high" ? "destructive" : n.priority === "normal" ? "warning" : "success"}>{n.priority}</Badge>
+                {loadingDetails ? (
+                  <>
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                  </>
+                ) : (
+                  <>
+                    <Badge variant={displayData.status === "done" ? "success" : "secondary"}>{displayData.status}</Badge>
+                    <Badge variant={displayData.priority === "high" ? "destructive" : displayData.priority === "normal" ? "warning" : "success"}>
+                      {displayData.priority}
+                    </Badge>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2.5">
-              {detail("Product", n.product?.name)}
-              {detail("Body", n.body)}
-              {detail("Priority", n.priority)}
-              {detail("Status", n.status)}
-              {detail("Sent Count", n.sent_count)}
-              {detail("Failed Count", n.failed_count)}
-              {detail("Current Batch", n.current_batch)}
-              {detail("States", n.product?.state?.join(", "))}
-              {detail("Created", n.created_at ? new Date(n.created_at).toLocaleString("en-IN") : null)}
-              {detail("Started", n.started_at ? new Date(n.started_at).toLocaleString("en-IN") : null)}
-              {n.status === "done" ? (detail("Completed", n.completed_at ? new Date(n.completed_at).toLocaleString("en-IN") : null)) : null}
+              {detail("Product", productName, false)}
+              {detail("Body", displayData.body || "-")}
+              {detail("Priority", displayData.priority)}
+              {detail("Status", displayData.status)}
+              {detail("Sent Count", displayData.sent_count)}
+              {detail("Failed Count", displayData.failed_count)}
+              {detail("Current Batch", displayData.current_batch)}
+              {detail("States", n.product?.state?.join(", "), false)}
+              {detail("Created", displayData.created_at ? new Date(displayData.created_at).toLocaleString("en-IN") : null)}
+              {displayData.started_at ? detail("Started", new Date(displayData.started_at).toLocaleString("en-IN")) : null}
+              {displayData.status === "done" ? detail("Completed", displayData.completed_at ? new Date(displayData.completed_at).toLocaleString("en-IN") : null) : null}
+              {displayData.status === "done" ? detail("Duration", formatDuration(displayData.duration_ms)) : null}
+              {loadingDetails ? (
+                <div className="space-y-2 mt-4">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : displayData.batches ? (
+                <div className="mt-4">
+                  <BatchesDetail batches={displayData.batches} />
+                </div>
+              ) : null}
             </div>
             <div className="px-6 py-4 border-t bg-muted/30 flex items-center gap-3">
               {!alreadySent && (
@@ -104,7 +196,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
               {alreadySent && (
                 <div className="flex-1 flex items-center gap-2 text-sm text-muted-foreground">
                   <Send className="w-4 h-4 text-green-500" />
-                  Sent to {n.sent_count} recipient{n.sent_count !== 1 ? "s" : ""}
+                  Sent to {displayData.sent_count} recipient{displayData.sent_count !== 1 ? "s" : ""}
                 </div>
               )}
               <Button variant="destructive" className="gap-2" onClick={() => { onDelete(n._id); onClose() }} disabled={isDeleting || isSending}>

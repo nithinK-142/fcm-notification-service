@@ -38,8 +38,8 @@ router.get("/", async (req, res) => {
         "product.name": 1,
         "product.image_url": 1,
         "product.state": 1,
-      }).sort({ created_at: -1 }).skip(skip).limit(Number(limit)).lean(),
-      Notification.countDocuments(query).lean(),
+      }).sort({ created_at: -1 }).skip(skip).limit(Number(limit)),
+      Notification.countDocuments(query),
       Notification.distinct("status").lean(),
     ]);
 
@@ -53,6 +53,32 @@ router.get("/", async (req, res) => {
   } catch (e) {
     console.error(e)
     res.status(500).json({ message: "Failed to fetch notifications" })
+  }
+})
+
+router.get("/:id", async (req, res) => {
+  try {
+    const notification = await Notification.findById(
+      req.params.id,
+      {
+        started_at: 1,
+        completed_at: 1,
+        body: 1,
+        status: 1,
+        priority: 1,
+        sent_count: 1,
+        failed_count: 1,
+        current_batch: 1,
+        created_at: 1,
+        updated_at: 1,
+        duration_ms: 1,
+        batches: 1,
+      }
+    ).lean()
+    return res.json(notification)
+  } catch (error) {
+    console.error(error)
+    return res.status(500).json({ message: "Failed to fetch notification" })
   }
 })
 
