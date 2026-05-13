@@ -132,7 +132,7 @@ function NotificationDetailModal({ notification: n, open, onClose, onSend, onDel
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden">
+      <DialogContent className="max-w-3xl p-0 overflow-hidden [&>button]:right-1 [&>button]:top-1">
         <div className="flex h-[520px]">
           <div className="w-72 shrink-0 bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center gap-3 p-4">
             {imageUrl
