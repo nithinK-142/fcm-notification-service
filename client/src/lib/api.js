@@ -29,6 +29,9 @@ export const updateNotification = (id, data) => api.patch(`/notifications/${id}`
 export const deleteNotification = (id) => api.delete(`/notifications/${id}`)
 export const sendNotification = (id) => api.post(`/notifications/${id}/send`)
 
+// Recipients
+export const getRecipients = () => api.get("/recipients")
+
 // Dashboard
 export const getDashboardStats = () => api.get("/dashboard/stats")
 

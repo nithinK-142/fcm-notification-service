@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { useTheme } from "@/context/ThemeContext"
 import { cn } from "@/lib/utils"
-import { Bell, LayoutDashboard, Package, LogOut, ChevronRight, PanelLeftClose, PanelLeftOpen, Sun, Moon } from "lucide-react"
+import { Bell, LayoutDashboard, Package, LogOut, ChevronRight, PanelLeftClose, PanelLeftOpen, Sun, Moon, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/products", label: "Products", icon: Package },
   { to: "/notifications", label: "Notifications", icon: Bell },
+  { to: "/recipients", label: "Recipients", icon: User },
 ]
 
 export default function Sidebar() {

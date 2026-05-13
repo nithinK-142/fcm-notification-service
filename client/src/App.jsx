@@ -8,6 +8,7 @@ import LoginPage from "@/pages/LoginPage"
 import DashboardPage from "@/pages/DashboardPage"
 import ProductsPage from "@/pages/ProductsPage"
 import NotificationsPage from "@/pages/NotificationsPage"
+import RecipientsPage from "@/pages/RecipientsPage"
 import useDesktopOnly from "@/hooks/useDesktopOnly"
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="recipients" element={<RecipientsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
