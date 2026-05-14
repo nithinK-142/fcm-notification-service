@@ -42,6 +42,10 @@ func loadConfig() Config {
 
 	mins := getEnvInt("SYNC_INTERVAL_MINUTES", 30)
 	interval := time.Duration(mins) * time.Minute
+	defaultLogPath := "fcm-sync.log"
+	if exe, err := exePath(); err == nil {
+		defaultLogPath = filepath.Join(filepath.Dir(exe), "fcm-sync.log")
+	}
 
 	cfg := Config{
 		LocalMongoURI:   requireEnv("LOCAL_MONGO_URI"),
@@ -53,7 +57,7 @@ func loadConfig() Config {
 		SyncInterval:    interval,
 		BatchSize:       getEnvInt("BATCH_SIZE", 500),
 		WorkerCount:     getEnvInt("WORKER_COUNT", 4),
-		LogFilePath:     getEnvOrDefault("LOG_FILE_PATH", "C:\\fcm-sync\\fcm-sync.log"),
+		LogFilePath:     getEnvOrDefault("LOG_FILE_PATH", defaultLogPath),
 		IsProd:          getEnvOrDefault("APP_ENV", "dev") == "prod",
 	}
 	return cfg
