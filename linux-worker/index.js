@@ -4,6 +4,7 @@ const { connectDB } = require("./db/db.js");
 const { initFirebase } = require("./config/firebase.js");
 const { logWithTimestamp } = require("./util/helper.js");
 const { processNotification } = require("./util/worker.js");
+const { purgeOldRecords } = require("./db/failed-tokens-db.js");
 
 const { MONGO_URI, DB_NAME } = process.env;
 
@@ -27,7 +28,9 @@ async function startWorker() {
 
   await recoverStuckNotifications();
 
-  cron.schedule("*/1 * * * *", processNotification);
+  cron.schedule("*/1 * * * *", processNotification); // every minute
+
+  cron.schedule("0 2 * * *", purgeOldRecords); // 2am daily
 
   logWithTimestamp(`[startWorker] ${cron.getTasks().size} cron tasks initialized`);
 }

@@ -2,8 +2,9 @@ const NodeCache = require("node-cache");
 const { Notification } = require("../models/notification.model.js")
 const { Recipient } = require("../models/recipient.model.js")
 const { sendMulticastNotification } = require("../config/multicast-notification.js");
-const { logWithTimestamp, chunk, delay } = require("./helper.js");
+const { logWithTimestamp, chunk } = require("./helper.js");
 const { xiorInstance } = require("./xior.js");
+const { storeFailedTokens } = require("../db/failed-tokens-db.js");
 
 let isRunning = false;
 
@@ -148,10 +149,33 @@ async function processNotification() {
           return sendMulticastNotification(notification, batchTokens).then(response => {
             let success = 0;
             let failure = 0;
+            const failedTokens = [];
+
             if (!response || !Array.isArray(response.responses)) {
               failure = batchTokens.length;
+              storeFailedTokens(notification._id.toString(), batchTokens, "NO_RESPONSE");
             } else {
-              response.responses.forEach(r => { if (r.success) success++; else failure++; });
+              response.responses.forEach((r, idx) => {
+                if (r.success) {
+                  success++;
+                } else {
+                  failure++;
+                  if (batchTokens[idx]) {
+                    failedTokens.push({
+                      token: batchTokens[idx],
+                      errorCode: r.error?.code || "UNKNOWN"
+                    });
+                  }
+                }
+              });
+              const byErrorCode = {};
+              failedTokens.forEach(f => {
+                if (!byErrorCode[f.errorCode]) byErrorCode[f.errorCode] = [];
+                byErrorCode[f.errorCode].push(f.token);
+              });
+              for (const [code, tokens] of Object.entries(byErrorCode)) {
+                storeFailedTokens(notification._id.toString(), tokens, code);
+              }
             }
             return {
               batch_no: i + wi + 1,
