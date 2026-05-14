@@ -21,6 +21,7 @@ type Config struct {
 	WorkerCount     int
 	LogFilePath     string
 	IsProd          bool
+	SyncSecret      string
 }
 
 // loadConfig reads from a .env file next to the binary, then falls back to
@@ -59,6 +60,7 @@ func loadConfig() Config {
 		WorkerCount:     getEnvInt("WORKER_COUNT", 4),
 		LogFilePath:     getEnvOrDefault("LOG_FILE_PATH", defaultLogPath),
 		IsProd:          getEnvOrDefault("APP_ENV", "dev") == "prod",
+		SyncSecret:      requireEnv("SYNC_SECRET"),
 	}
 	return cfg
 }

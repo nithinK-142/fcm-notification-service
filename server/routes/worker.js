@@ -1,5 +1,6 @@
 const { Router } = require("express");
-const { getModels } = require("../models/models.js")
+const { getModels } = require("../models/models.js");
+const { createSyncSignature } = require("../util/helper.js");
 
 const router = Router()
 const { Product, ProductPriceLog } = getModels()
@@ -52,7 +53,11 @@ router.post("/check-and-create-body", async (req, res) => {
 
 router.post("/sync/trigger", async (req, res) => {
   try {
-    const response = await fetch(`${process.env.GO_SYNC_URL}/sync`, { method: "POST" })
+    const { signature, timestamp } = createSyncSignature()
+    const response = await fetch(`${process.env.GO_SYNC_URL}/sync`, {
+      method: "POST",
+      headers: { "x-signature": signature, "x-timestamp": timestamp, }
+    })
     if (!response.ok) {
       const text = await response.text()
       console.error("Go service error:", response.status, text)

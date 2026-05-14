@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+
 async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -36,10 +38,18 @@ function escapeRegex(value) {
   return value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function createSyncSignature() {
+  const secret = process.env.GO_SYNC_SECRET
+  const timestamp = Date.now().toString()
+  const signature = crypto.createHmac("sha256", secret).update(timestamp).digest("hex")
+  return { timestamp, signature }
+}
+
 module.exports = {
   delay,
   chunk,
   getTimestamp,
   logWithTimestamp,
   escapeRegex,
+  createSyncSignature,
 };
