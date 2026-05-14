@@ -394,12 +394,10 @@ export default function NotificationsPage() {
           variant="outline"
           size="icon"
           onClick={() => { setStatus(["All"]); setSearch(""); setDebouncedSearch(""); setPage(1); }}
+          title="Refresh"
           disabled={loading}
         >
-          {loading
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : <RefreshCw className="w-4 h-4" />
-          }
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </Button>
       </div>
 

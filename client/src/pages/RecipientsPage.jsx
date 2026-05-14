@@ -126,14 +126,12 @@ export default function RecipientsPage() {
             <span className="text-xs text-muted-foreground">total</span>
           </div>
 
-          {/* Sync now — wired up later */}
-          <Button variant="outline" className="gap-2" disabled>
-            <RefreshCcw className="w-4 h-4" />
-            Sync Now
+          <Button variant="outline" className="gap-2" title="Sync" onClick={handleSync} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />Sync Recipients
           </Button>
 
-          <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          <Button variant="outline" size="icon" title="Refresh" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
