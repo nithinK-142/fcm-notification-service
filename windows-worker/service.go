@@ -50,6 +50,7 @@ func runService() {
 	setupFileLogger(cfg.LogFilePath)
 
 	log.Printf("Starting %s as Windows service", serviceName)
+	go startHealthServer(cfg)
 	if err := svc.Run(serviceName, &fcmService{cfg: cfg}); err != nil {
 		log.Fatalf("service run failed: %v", err)
 	}

@@ -48,6 +48,7 @@ func main() {
 	case "run":
 		// Foreground mode for testing
 		cfg := loadConfig()
+		go startHealthServer(cfg)
 		runSyncLoop(cfg)
 	default:
 		log.Fatalf("unknown command: %s", os.Args[1])
