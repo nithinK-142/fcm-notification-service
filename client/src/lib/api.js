@@ -38,4 +38,7 @@ export const getDashboardStats = () => api.get("/dashboard/stats")
 // Auth
 export const loginUser = (email, password) => api.post("/auth/login", { email, password })
 
+// Worker
+export const triggerSync = () => api.post("/worker/sync/trigger")
+
 export default api

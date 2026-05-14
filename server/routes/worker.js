@@ -50,4 +50,19 @@ router.post("/check-and-create-body", async (req, res) => {
   return res.json({ message, body })
 })
 
+router.post("/sync/trigger", async (req, res) => {
+  try {
+    const response = await fetch(`${process.env.GO_SYNC_URL}/sync`, { method: "POST" })
+    if (!response.ok) {
+      const text = await response.text()
+      console.error("Go service error:", response.status, text)
+      return res.status(500).json({ message: `Sync failed: ${text}` })
+    }
+    res.json({ message: "Sync triggered successfully" })
+  } catch (error) {
+    console.error("Failed to trigger sync:", error.message)
+    res.status(500).json({ message: `Failed to trigger sync: ${error.message}` })
+  }
+})
+
 module.exports = router;

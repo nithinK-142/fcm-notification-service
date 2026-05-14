@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getRecipients } from "@/lib/api"
+import { getRecipients, triggerSync } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skel, SkeletonGrid } from "@/components/ui/skeletons"
@@ -82,6 +82,7 @@ export default function RecipientsPage() {
   const [error, setError] = useState(null)
   const [stateSort, setStateSort] = useState("COUNT_DESC")
   const [categorySort, setCategorySort] = useState("COUNT_DESC")
+  const [syncing, setSyncing] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -98,6 +99,18 @@ export default function RecipientsPage() {
   }
 
   useEffect(() => { fetchData() }, [])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await triggerSync()
+      toast.success("Sync triggered — recipients will update shortly")
+    } catch {
+      toast.error("Failed to trigger sync")
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const states = data?.recipientsByState ?? []
   const categories = data ? Object.entries(data.recipientsByRegCategory) : []
