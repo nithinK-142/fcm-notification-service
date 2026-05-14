@@ -228,6 +228,7 @@ export default function NotificationsPage() {
   const [editNotif, setEditNotif] = useState(null)
   const [editBody, setEditBody] = useState("")
   const [statuses, setStatuses] = useState(["All"])
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const fetchNotifications = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -249,7 +250,7 @@ export default function NotificationsPage() {
   }, [debouncedSearch, status, page, pageSize])
 
   useEffect(() => { setPage(1) }, [debouncedSearch, status, pageSize])
-  useEffect(() => { fetchNotifications(page, pageSize) }, [page, pageSize, debouncedSearch, status])
+  useEffect(() => { fetchNotifications(page, pageSize) }, [page, pageSize, debouncedSearch, status, refreshKey])
 
   const handlePageChange = (p) => { setPage(p); window.scrollTo(0, 0) }
   const handlePageSizeChange = (s) => { setPageSize(s); setPage(1) }
@@ -393,7 +394,13 @@ export default function NotificationsPage() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => { setStatus(["All"]); setSearch(""); setDebouncedSearch(""); setPage(1); }}
+          onClick={() => {
+            setStatuses(["All"]);
+            setSearch("");
+            setDebouncedSearch("");
+            setPage(1);
+            setRefreshKey(prev => prev + 1);
+          }}
           title="Refresh"
           disabled={loading}
         >

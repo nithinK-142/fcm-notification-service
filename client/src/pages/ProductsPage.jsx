@@ -163,6 +163,7 @@ export default function ProductsPage() {
   const [total, setTotal] = useState(0)
   const [creating, setCreating] = useState(false)
   const [categories, setCategories] = useState([])
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const fetchProducts = useCallback(async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -180,7 +181,7 @@ export default function ProductsPage() {
   }, [debouncedSearch, category, page])
 
   useEffect(() => { setPage(1) }, [debouncedSearch, category, pageSize])
-  useEffect(() => { fetchProducts(page, pageSize) }, [page, pageSize, debouncedSearch, category])
+  useEffect(() => { fetchProducts(page, pageSize) }, [page, pageSize, debouncedSearch, category, refreshKey])
 
   const handlePageChange = (p) => { setPage(p); setSelected(new Set()); window.scrollTo(0, 0) }
   const handlePageSizeChange = (s) => { setPageSize(s); setPage(1); setSelected(new Set()) }
@@ -306,7 +307,13 @@ export default function ProductsPage() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => {setSearch(""); setDebouncedSearch(""); setCategory("All"); setPage(1);}}
+          onClick={() => {
+            setSearch("");
+            setDebouncedSearch("");
+            setCategory("All");
+            setPage(1);
+            setRefreshKey(prev => prev + 1);
+          }}
           title="Refresh"
           disabled={loading}
         >
