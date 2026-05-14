@@ -64,47 +64,27 @@ This runs the sync loop in your terminal — first sync fires immediately, then 
 
 ---
 
-## Building
-
-### On Windows
-
-```powershell
-go build -o fcm-sync.exe .
-```
-
-### Cross-compile from Linux / Mac (targeting Windows)
-
-```bash
-GOOS=windows GOARCH=amd64 go build -o fcm-sync.exe .
-```
-
----
-
 ## Deployment on Windows Server
+Open PowerShell as Administrator and navigate to the project folder:
 
-### 1. Prepare the directory
+### 1. Build
 
 Run in PowerShell as Administrator:
 
 ```powershell
-New-Item -ItemType Directory -Path "C:\fcm-sync" -Force
+go build -o build\fcm-sync.exe .
 ```
-
-Copy `fcm-sync.exe` to `C:\fcm-sync\`.
 
 ### 2. Set up config
 
 ```powershell
-Copy-Item .env.example C:\fcm-sync\.env
-notepad C:\fcm-sync\.env
+Copy-Item .env build\.env
 ```
-
-Fill in all required values (see `.env.example` for the full list). The binary reads `.env` from the same directory as the executable.
 
 ### 3. Install the service
 
 ```powershell
-cd C:\fcm-sync
+cd build
 .\fcm-sync.exe install
 ```
 
@@ -127,10 +107,30 @@ Get-Service FCMSyncWorker
 Tail the log file:
 
 ```powershell
-Get-Content C:\fcm-sync\fcm-sync.log -Wait
+Get-Content .\fcm-sync.log -Wait
 ```
 
 ---
+
+## Service Removal
+
+### Stop the service
+```powershell
+.\fcm-sync.exe stop
+```
+
+### Remove the service from SCM
+```powershell
+.\fcm-sync.exe remove
+```
+
+### Delete all generated files
+```powershell
+Remove-Item .\fcm-sync.log -Force -ErrorAction SilentlyContinue
+Remove-Item .\checkpoint.json -Force -ErrorAction SilentlyContinue
+Remove-Item .\fcm-sync.exe -Force
+Remove-Item .\.env -Force
+```
 
 ## Service management
 
