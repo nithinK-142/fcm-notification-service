@@ -25,6 +25,12 @@ func startHealthServer(cfg Config) {
 		w.Write([]byte("OK"))
 	})
 
-	log.Println("Go server listening on :9573")
-	http.ListenAndServe(":9573", nil)
+	server := &http.Server{
+		Addr:         "127.0.0.1:9573",
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		Handler:      nil,
+	}
+	log.Println("Go server listening on 127.0.0.1:9573")
+	log.Fatal(server.ListenAndServe())
 }
