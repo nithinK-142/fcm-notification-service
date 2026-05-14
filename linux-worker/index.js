@@ -28,7 +28,7 @@ async function startWorker() {
 
   await recoverStuckNotifications();
 
-  cron.schedule("*/1 * * * *", processNotification); // every minute
+  cron.schedule("* 7-22 * * *", processNotification); // every minute 7am to 10pm
 
   cron.schedule("0 2 * * *", purgeOldRecords); // 2am daily
 
