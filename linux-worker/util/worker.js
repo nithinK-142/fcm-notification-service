@@ -2,7 +2,7 @@ const NodeCache = require("node-cache");
 const { Notification } = require("../models/notification.model.js")
 const { Recipient } = require("../models/recipient.model.js")
 const { sendMulticastNotification } = require("../config/multicast-notification.js");
-const { logWithTimestamp, chunk } = require("./helper.js");
+const { logWithTimestamp, chunk, createWorkerSignature } = require("./helper.js");
 const { xiorInstance } = require("./xior.js");
 const { storeFailedTokens } = require("../db/failed-tokens-db.js");
 
@@ -14,7 +14,11 @@ const CONCURRENT_BATCHES = process.env.CONCURRENT_BATCHES || 3;
 
 async function checkAndCreateBody(productId, isBodyRequired) {
   try {
-    const response = await xiorInstance.post("/worker/check-and-create-body", { id: productId, isBodyRequired })
+    const payload = { id: productId, isBodyRequired }
+    const { timestamp, signature } = createWorkerSignature(payload)
+    const response = await xiorInstance.post("/worker/check-and-create-body", payload, {
+      headers: { "x-timestamp": timestamp, "x-signature": signature, }
+    })
     return { status: response.data.message, body: response.data.body }
   } catch (error) {
     logWithTimestamp("[checkAndCreateBody] Error:", error)

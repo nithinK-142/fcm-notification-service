@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const { getModels } = require("../models/models.js");
 const { createSyncSignature } = require("../util/helper.js");
+const { verifyWorkerSignature } = require("../middleware/worker-auth.js");
 
 const router = Router()
 const { Product, ProductPriceLog } = getModels()
@@ -31,7 +32,7 @@ async function createNotificationBody(product) {
   return defaultText;
 }
 
-router.post("/check-and-create-body", async (req, res) => {
+router.post("/check-and-create-body", verifyWorkerSignature, async (req, res) => {
   const { id, isBodyRequired } = req.body;
   let message = "available";
   const product = await Product.findOne(

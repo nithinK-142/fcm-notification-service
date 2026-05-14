@@ -1,3 +1,5 @@
+const crypto = require("crypto")
+
 async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -32,10 +34,18 @@ function logWithTimestamp(...args) {
   console.log(getTimestamp(), ":", ...args);
 }
 
+function createWorkerSignature(payload) {
+  const secret = process.env.SERVER_SECRET
+  const timestamp = Date.now().toString()
+  const data = `${timestamp}:${JSON.stringify(payload)}`
+  const signature = crypto.createHmac("sha256", secret).update(data).digest("hex")
+  return { timestamp, signature }
+}
 
 module.exports = {
   delay,
   chunk,
   getTimestamp,
   logWithTimestamp,
+  createWorkerSignature,
 };
