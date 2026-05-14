@@ -3,8 +3,10 @@ import { getRecipients, triggerSync } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skel, SkeletonGrid } from "@/components/ui/skeletons"
-import { Loader2, RefreshCw, Users, MapPin, Tag, RefreshCcw } from "lucide-react"
+import { RefreshCw, Users, MapPin, Tag } from "lucide-react"
 import { cn, formatStateName } from "@/lib/utils"
+import { confirmToast } from "@/components/ConfirmToast"
+import toast from "react-hot-toast"
 
 function StatCard({ title, count, subtitle, dim }) {
   return (
@@ -101,10 +103,12 @@ export default function RecipientsPage() {
   useEffect(() => { fetchData() }, [])
 
   const handleSync = async () => {
+    const confirmed = await confirmToast("This will trigger a full sync from local database")
+    if (!confirmed) return
     setSyncing(true)
     try {
-      await triggerSync()
-      toast.success("Sync triggered — recipients will update shortly")
+      const res = await triggerSync()
+      toast.success(res.data?.message || "Sync triggered successfully")
     } catch {
       toast.error("Failed to trigger sync")
     } finally {
