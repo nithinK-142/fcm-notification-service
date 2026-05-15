@@ -262,7 +262,5 @@ VITE_API_URL  (Express server base URL)
 
 ## Security Notes
 
-- Passwords stored in plaintext in `teammembers` collection — should be hashed (bcrypt)
-- `/api/worker/*` is public (no JWT) — intended for internal network only, should be firewall-restricted or use a shared secret
 - JWT expiry: 7 days
 - CORS restricted to `ALLOWED_URLS` env var (comma-separated)
