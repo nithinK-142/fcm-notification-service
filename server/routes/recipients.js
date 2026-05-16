@@ -1,10 +1,12 @@
 const { Router } = require("express");
 const { getModels } = require("../models/models.js");
+const { CustomError } = require("../util/custom-error.js");
+const { routeHandler } = require("../middleware/request.middleware.js");
 
 const router = Router()
 const { Recipient, Category } = getModels()
 
-router.get("/", async (req, res) => {
+router.get("/", routeHandler(async (req, res) => {
   try {
     const [
       totalRecipients,
@@ -34,15 +36,15 @@ router.get("/", async (req, res) => {
       return acc
     }, {})
 
-    return res.json({
+    return res.success({
       totalRecipients,
       recipientsByState,
       recipientsByRegCategory: regCategoryLookup,
     })
-  } catch (e) {
-    console.error(e)
-    res.status(500).json({ message: "Failed to fetch recipients" })
+  } catch (error) {
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to fetch recipients", error)
   }
-})
+}))
 
 module.exports = router;

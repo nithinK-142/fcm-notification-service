@@ -1,10 +1,12 @@
 const { Router } = require("express");
 const { getModels } = require("../models/models.js");
+const { CustomError } = require("../util/custom-error.js");
+const { routeHandler } = require("../middleware/request.middleware.js");
 
 const router = Router();
 const { Product, Notification, Recipient } = getModels();
 
-router.get("/stats", async (req, res) => {
+router.get("/stats", routeHandler(async (req, res) => {
   try {
     const [
       totalProducts,
@@ -45,7 +47,7 @@ router.get("/stats", async (req, res) => {
         .select("product_name product_main_image_file_name listing_price product_status grade brand_name createdAt"),
     ]);
 
-    res.json({
+    return res.success({
       totalProducts,
       activeProducts,
       totalNotifications,
@@ -73,10 +75,10 @@ router.get("/stats", async (req, res) => {
         createdAt: p.createdAt,
       })),
     });
-  } catch (e) {
-    console.error("[dashboard/stats]", e);
-    res.status(500).json({ message: "Failed to fetch stats" });
+  } catch (error) {
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to fetch stats", error)
   }
-});
+}));
 
 module.exports = router;

@@ -1,11 +1,13 @@
 const { Router } = require("express");
 const { getModels } = require("../models/models.js");
 const { escapeRegex } = require("../util/helper.js");
+const { CustomError } = require("../util/custom-error.js");
+const { routeHandler } = require("../middleware/request.middleware.js");
 
 const router = Router()
 const { Product, Category } = getModels()
 
-router.post("/", async (req, res) => {
+router.post("/", routeHandler(async (req, res) => {
   try {
     const { search, category, page = 1, limit = 25 } = req.body
 
@@ -119,7 +121,7 @@ router.post("/", async (req, res) => {
       })
     })
 
-    return res.json({
+    return res.success({
       products: result,
       categories: [
         { id: "All", name: "All Categories" },
@@ -144,10 +146,10 @@ router.post("/", async (req, res) => {
         totalPages: Math.ceil(total / Number(limit))
       },
     })
-  } catch (e) {
-    console.error(e)
-    res.status(500).json({ message: "Failed to fetch products" })
+  } catch (error) {
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to fetch products", error)
   }
-})
+}))
 
 module.exports = router;
