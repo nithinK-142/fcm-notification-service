@@ -1,13 +1,14 @@
 const { Router } = require("express");
 const { getModels } = require("../models/models.js");
-const { logWithTimestamp } = require("../../linux-worker/util/helper.js");
 const { PRIORITY_RANK } = require("../util/constants.js");
 const { escapeRegex } = require("../util/helper.js");
+const { CustomError } = require("../util/custom-error.js");
+const { routeHandler } = require("../middleware/request.middleware.js");
 
 const router = Router()
 const { Notification } = getModels()
 
-router.get("/", async (req, res) => {
+router.get("/", routeHandler(async (req, res) => {
   try {
     const { search, status, page = 1, limit = 25 } = req.query
 
@@ -43,20 +44,20 @@ router.get("/", async (req, res) => {
       Notification.distinct("status").lean(),
     ]);
 
-    return res.json({
+    return res.success({
       notifications: result,
       statuses: ["All", ...statuses],
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
     })
-  } catch (e) {
-    console.error(e)
-    res.status(500).json({ message: "Failed to fetch notifications" })
+  } catch (error) {
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to fetch notifications", error)
   }
-})
+}))
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", routeHandler((async (req, res) => {
   try {
     const notification = await Notification.findById(
       req.params.id,
@@ -75,68 +76,73 @@ router.get("/:id", async (req, res) => {
         batches: 1,
       }
     ).lean()
-    return res.json(notification)
+    return res.success(notification)
   } catch (error) {
-    console.error(error)
-    return res.status(500).json({ message: "Failed to fetch notification" })
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to fetch notification", error)
   }
-})
+})))
 
-router.post("/", async (req, res) => {
-  const rawDocs = req.body;
-  const notifications = [];
+router.post("/", routeHandler(async (req, res) => {
+  try {
+    const rawDocs = req.body;
+    const notifications = [];
 
-  for (const doc of rawDocs) {
-    const { id, name, skuUic, imageUrl, state, body, priority, grade, brand, price, category } = doc;
-    notifications.push({
-      product: {
-        id,
-        name,
-        image_url: imageUrl,
-        state,
-        sku_uic: skuUic,
-        grade,
-        brand,
-        price,
-        category: {
-          registration: category.registration ? {
-            id: category.registration?.id,
-            category_title: category.registration?.categoryTitle,
-            category_type: category.registration?.categoryType,
-          } : null,
-          main: category.main ? {
-            id: category.main?.id,
-            category_title: category.main?.categoryTitle,
-            category_type: category.main?.categoryType,
-          } : null,
-          sub: category.sub ? {
-            id: category.sub?.id,
-            category_title: category.sub?.categoryTitle,
-            category_type: category.sub?.categoryType,
-          } : null,
+    for (const doc of rawDocs) {
+      const { id, name, skuUic, imageUrl, state, body, priority, grade, brand, price, category } = doc;
+      notifications.push({
+        product: {
+          id,
+          name,
+          image_url: imageUrl,
+          state,
+          sku_uic: skuUic,
+          grade,
+          brand,
+          price,
+          category: {
+            registration: category.registration ? {
+              id: category.registration?.id,
+              category_title: category.registration?.categoryTitle,
+              category_type: category.registration?.categoryType,
+            } : null,
+            main: category.main ? {
+              id: category.main?.id,
+              category_title: category.main?.categoryTitle,
+              category_type: category.main?.categoryType,
+            } : null,
+            sub: category.sub ? {
+              id: category.sub?.id,
+              category_title: category.sub?.categoryTitle,
+              category_type: category.sub?.categoryType,
+            } : null,
+          },
         },
-      },
-      body,
-      priority,
-      priority_rank: PRIORITY_RANK[priority] ?? 2,
-    });
+        body,
+        priority,
+        priority_rank: PRIORITY_RANK[priority] ?? 2,
+      });
+    }
+    const created = await Notification.insertMany(Array.from(new Map(notifications.map(n => [n.product.id, n])).values()))
+    return res.success(created)
+  } catch (error) {
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to create notifications", error)
   }
-  const created = await Notification.insertMany(Array.from(new Map(notifications.map(n => [n.product.id, n])).values()))
-  res.status(201).json(created)
-})
+}))
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", routeHandler(async (req, res) => {
   try {
     const { id } = req.params
     const { body } = req.body
 
     const notification = await Notification.findById(id)
     if (!notification) {
-      return res.status(404).json({ message: "Notification not found" })
+      throw new CustomError(404, "Notification not found")
     }
 
     if (notification.status !== "pending") {
-      return res.status(409).json({ message: "Only pending notifications can be edited" })
+      throw new CustomError(409, "Only pending notifications can be edited")
     }
 
     const result = await Notification.updateOne(
@@ -144,56 +150,56 @@ router.patch("/:id", async (req, res) => {
       { $set: { body, updated_at: new Date() } }
     )
     if (result.modifiedCount === 0) {
-      return res.status(409).json({ message: "Only pending notifications can be edited" })
+      throw new CustomError(409, "Only pending notifications can be edited")
     }
-    return res.status(200).json({ message: "Notification updated successfully" })
+    return res.success({ message: "Notification updated successfully" })
   } catch (error) {
-    logWithTimestamp("[update notification]", error)
-    return res.status(500).json({ message: "Failed to update notification" })
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to update notification")
   }
-})
+}))
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", routeHandler(async (req, res) => {
   try {
     const { id } = req.params
 
     const notification = await Notification.findById(id)
     if (!notification) {
-      return res.status(404).json({ message: "Notification not found" })
+      throw new CustomError(404, "Notification not found")
     }
 
     if (["locked", "processing"].includes(notification.status)) {
-      return res.status(409).json({ message: `Cannot delete notification with status '${notification.status}'` })
+      throw new CustomError(409, `Cannot delete notification with status '${notification.status}'`)
     }
 
     const result = await Notification.deleteOne({ _id: id, status: { $nin: ["locked", "processing"] }, })
     if (result.deletedCount === 0) {
-      return res.status(409).json({ message: "Notification cannot be deleted while locked or processing" })
+      throw new CustomError(409, "Notification cannot be deleted while locked or processing")
     }
 
-    return res.status(200).json({ message: "Notification deleted successfully" })
+    return res.success({ message: "Notification deleted successfully" })
   } catch (error) {
-    logWithTimestamp("[delete notification]", error)
-    return res.status(500).json({ message: "Failed to delete notification" })
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to delete notification")
   }
-})
+}))
 
-router.post("/:id/send", async (req, res) => {
+router.post("/:id/send", routeHandler(async (req, res) => {
   try {
     const { id } = req.params;
 
     const notification = await Notification.findById(id)
     if (!notification) {
-      return res.status(404).json({ message: "Notification not found" })
+      throw new CustomError(404, "Notification not found")
     }
 
 
     if (notification.status !== "pending") {
-      return res.status(409).json({ message: `Cannot send notification with status '${notification.status}'` })
+      throw new CustomError(409, `Cannot send notification with status '${notification.status}'`)
     }
 
     if (notification.execute_now) {
-      return res.status(409).json({ message: "Notification is already marked for send now" })
+      throw new CustomError(409, "Notification is already marked for send now")
     }
 
     const activeExecuteNowNotification = await Notification.findOne({
@@ -203,7 +209,7 @@ router.post("/:id/send", async (req, res) => {
     })
 
     if (activeExecuteNowNotification) {
-      return res.status(409).json({ message: "Another notification is already marked for send now" })
+      throw new CustomError(409, "Another notification is already marked for send now")
     }
 
     const result = await Notification.updateOne(
@@ -211,14 +217,14 @@ router.post("/:id/send", async (req, res) => {
       { $set: { execute_now: true, priority_rank: 0, updated_at: new Date() } }
     )
     if (result.modifiedCount === 0) {
-      return res.status(409).json({ message: "Notification could not be marked for send now" })
+      throw new CustomError(409, "Notification could not be marked for send now")
     }
 
     return res.status(200).json({ message: "Notification will send immediately or in the next run" })
   } catch (error) {
-    logWithTimestamp("[send notification]", error)
-    return res.status(500).json({ message: "Failed to send notification" })
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to send notification")
   }
-})
+}))
 
 module.exports = router;

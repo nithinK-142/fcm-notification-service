@@ -2,6 +2,8 @@ const { Router } = require("express");
 const { getModels } = require("../models/models.js");
 const { createSyncSignature } = require("../util/helper.js");
 const { verifyWorkerSignature } = require("../middleware/worker-auth.js");
+const { CustomError } = require("../util/custom-error.js");
+const { routeHandler } = require("../middleware/request.middleware.js");
 
 const router = Router()
 const { Product, ProductPriceLog } = getModels()
@@ -32,27 +34,32 @@ async function createNotificationBody(product) {
   return defaultText;
 }
 
-router.post("/check-and-create-body", verifyWorkerSignature, async (req, res) => {
-  const { id, isBodyRequired } = req.body;
-  let message = "available";
-  const product = await Product.findOne(
-    { _id: id },
-    { _id: 1, product_status: 1, avl_stock: 1, listing_price: 1 }
-  )
+router.post("/check-and-create-body", verifyWorkerSignature, routeHandler(async (req, res) => {
+  try {
+    const { id, isBodyRequired } = req.body;
+    let message = "available";
+    const product = await Product.findOne(
+      { _id: id },
+      { _id: 1, product_status: 1, avl_stock: 1, listing_price: 1 }
+    )
 
-  if (!product) message = "not_found";
-  if (product.avl_stock <= 0) message = "no_stock";
-  if (product.avl_stock > 0 && product.product_status === "Deactive") message = "deactive";
+    if (!product) message = "not_found";
+    if (product.avl_stock <= 0) message = "no_stock";
+    if (product.avl_stock > 0 && product.product_status === "Deactive") message = "deactive";
 
-  let body;
-  if (isBodyRequired) {
-    body = await createNotificationBody(product);
+    let body;
+    if (isBodyRequired) {
+      body = await createNotificationBody(product);
+    }
+
+    return res.success({ message, body })
+  } catch (error) {
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, "Failed to check and create body", error)
   }
+}))
 
-  return res.json({ message, body })
-})
-
-router.post("/sync/trigger", async (req, res) => {
+router.post("/sync/trigger", routeHandler(async (req, res) => {
   try {
     const { signature, timestamp } = createSyncSignature()
     const response = await fetch(`${process.env.GO_SYNC_URL}/sync`, {
@@ -61,14 +68,13 @@ router.post("/sync/trigger", async (req, res) => {
     })
     if (!response.ok) {
       const text = await response.text()
-      console.error("Go service error:", response.status, text)
-      return res.status(500).json({ message: `Sync failed: ${text}` })
+      throw new CustomError(500, `Sync failed: ${text}`)
     }
-    res.json({ message: "Sync triggered successfully" })
+    return res.success({ message: "Sync triggered successfully" })
   } catch (error) {
-    console.error("Failed to trigger sync:", error.message)
-    res.status(500).json({ message: `Failed to trigger sync: ${error.message}` })
+    if (error instanceof CustomError) throw error
+    throw new CustomError(500, `Failed to trigger sync: ${error.message}`, error)
   }
-})
+}))
 
 module.exports = router;
