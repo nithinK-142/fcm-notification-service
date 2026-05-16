@@ -3,6 +3,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
+const { requestTracing, loggerMiddleware } = require("./middleware/request.middleware.js");
+const { responseMiddleware, errorMiddleware } = require("./middleware/response.middleware.js")
 const { authenticate } = require("./middleware/auth.js");
 const { connectDBs } = require("./db/db.js");
 const { initModels } = require("./models/models.js");
@@ -11,8 +13,12 @@ const { logWithTimestamp } = require("./util/helper.js");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Middlewares
 app.use(cors({ origin: process.env.ALLOWED_URLS.split(","), credentials: true }));
-app.use(express.json());
+app.use(requestTracing)
+app.use(express.json())
+app.use(loggerMiddleware)
+app.use(responseMiddleware)
 
 const { MONGO_URI_LOCAL, DB_NAME_LOCAL, LOCAL_DB_LABEL, MONGO_URI_ATLAS, DB_NAME_ATLAS, ATLAS_DB_LABEL } = process.env;
 
@@ -49,6 +55,9 @@ async function startServer() {
     app.use("/api/notifications", authenticate, notificationRoutes);
     app.use("/api/recipients", authenticate, recipientRoutes);
     app.use("/api/dashboard", authenticate, dashboardRoutes);
+
+    // Error middleware
+    app.use(errorMiddleware)
 
     app.listen(PORT, () => {
       logWithTimestamp(`[startServer] Server running on ${PORT}`);
